@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <string.h>
+#include "tcpServerUtil.h"
 #include "logger.h"
 #include "util.h"
 
@@ -117,4 +118,77 @@ int handleTCPEchoClient(int clntSocket) {
 
 	close(clntSocket);
 	return 0;
+}
+
+typedef struct {
+	char buffer[BUFSIZE];
+	size_t read_bytes;
+} echo_data;
+
+static const struct fd_handler echo_handler = {
+	.handle_read = echo_read,
+	.handle_close = echo_close,
+};
+
+// Non blocking accept
+void accept_connection(struct selector_key *key) {
+	int server_fd = key->fd;
+	fd_selector selector = key->data;
+	struct sockaddr_storage client_addr;
+	socklen_t client_addr_len = sizeof(client_addr);
+
+	// Accept a new connection
+	int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+
+	// Check if accept was successful
+	if(client_fd < 0) {
+		log(ERROR, "accept() failed: %s", strerror(errno));
+		return;
+	}
+
+	// Set the client socket to non-blocking
+	if(selector_fd_set_nio(client_fd) == -1) {
+		log(ERROR, "Failed to set client socket to non-blocking: %s", strerror(errno));
+		close(client_fd);
+		return;
+	}
+
+	echo_data *data = malloc(sizeof(*data));
+	if(data == NULL) {
+		log(ERROR, "malloc() failed");
+		close(client_fd);
+		return;
+	}
+	data->read_bytes = 0;
+
+	// Register the client socket with the selector
+	if(selector_register(selector, client_fd, &echo_handler, OP_READ, data) != SELECTOR_SUCCESS) {
+		log(ERROR, "selector_register() failed for client");
+		close(client_fd);
+		free(data);
+		return;
+	}
+
+	log(INFO, "New client connected: fd=%d", client_fd);
+}
+
+void echo_read(struct selector_key *key) {
+	echo_data *data = key->data;
+	ssize_t n = recv(key->fd, data->buffer, BUFSIZE, 0);
+
+	if(n > 0) {
+		send(key->fd, data->buffer, n, 0);  // echo
+	} else if (n == 0 || (n < 0 && errno != EAGAIN)) {
+		selector_unregister_fd(key->s, key->fd);
+		close(key->fd);
+		//free(data);
+		log(INFO, "Client closed connection: fd=%d", key->fd);
+	}
+}
+
+void echo_close(struct selector_key *key) {
+	if(key->data != NULL) {
+		free(key->data);
+	}
+	close(key->fd);
 }
