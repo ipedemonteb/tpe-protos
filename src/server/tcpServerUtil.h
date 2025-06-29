@@ -9,11 +9,6 @@
 // Create, bind, and listen a new TCP server socket
 int setupTCPServerSocket(const char *service);
 
-// Accept a new TCP connection on a server socket
-int acceptTCPConnection(int servSock);
-
-// Accept non blocking
-void accept_connection(struct selector_key *key);
 void echo_read(struct selector_key *key);
 void echo_close(struct selector_key *key);
 

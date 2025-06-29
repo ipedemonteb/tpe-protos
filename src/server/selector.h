@@ -1,6 +1,7 @@
 #ifndef SELECTOR_H_W50GNLODsARolpHbsDsrvYvMsbT
 #define SELECTOR_H_W50GNLODsARolpHbsDsrvYvMsbT
 
+#include <stddef.h>
 #include <sys/time.h>
 #include <stdbool.h>
 
