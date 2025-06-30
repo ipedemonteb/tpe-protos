@@ -256,7 +256,14 @@ unsigned auth_read(struct selector_key *key) {
     buffer_write(&connection->write_buffer, AUTH_VERSION);
     buffer_write(&connection->write_buffer, auth_status);
 
-    return STATE_AUTH_WRITE;
+    if (auth_status == 0x00) {
+        log(INFO, "Authentication successful for user: %s", username);
+        return STATE_AUTH_WRITE;
+    } else {
+        log(ERROR, "Authentication failed for user: %s", username);
+        // Still write the response even if auth fails, but it should go to a different state, in which it closes the connection
+        return STATE_AUTH_WRITE; 
+    }
 }
 
 unsigned request_read(struct selector_key *key) {
