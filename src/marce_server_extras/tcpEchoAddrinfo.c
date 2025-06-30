@@ -9,8 +9,8 @@
 #include <netinet/in.h>
 #include <sys/time.h> 
 #include <netdb.h>
-#include "logger.h"
-#include "tcpServerUtil.h"
+#include "../utils/logger.h"
+#include "../server/tcpServerUtil.h"
 
 #define max(n1,n2)     ((n1)>(n2) ? (n1) : (n2))
 

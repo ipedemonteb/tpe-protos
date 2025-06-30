@@ -5,22 +5,22 @@
 #include <sys/socket.h>
 #include "selector.h"
 #include "buffer.h"
+#include "stm.h"
 
 #define BUFFER_SIZE 4096
 
 typedef enum {
-    HELLO_READ,
-    HELLO_WRITE,
-    REQUEST_READ,
-    REQUEST_WRITE,
-    FORWARD_READ,
-    FORWARD_WRITE,
-    DONE,
-    ERROR_STATE,
+    STATE_HELLO_READ = 0,
+    STATE_HELLO_WRITE,
+    STATE_REQUEST_READ,
+    STATE_REQUEST_WRITE,
+    STATE_FORWARD_READ,
+    STATE_FORWARD_WRITE,
+    STATE_DONE,
+    STATE_ERROR,
 } socks5_state;
 
 typedef struct socks5_connection {
-    socks5_state state;
     int client_fd;
     int origin_fd;
     struct buffer read_buffer;
@@ -29,6 +29,7 @@ typedef struct socks5_connection {
     uint8_t raw_read[BUFFER_SIZE];
     uint8_t raw_write[BUFFER_SIZE];
     uint8_t raw_origin[BUFFER_SIZE];
+    struct state_machine stm;
 } socks5_connection;
 
 void accept_connection(struct selector_key *key);

@@ -18,7 +18,7 @@ int init_server(char *serv_port);
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        log(FATAL, "usage: %s <Server Port>", argv[0]);
+        log(FATAL, "Usage: %s <Server Port>", argv[0]);
     }
 
     char * serv_port = argv[1];
