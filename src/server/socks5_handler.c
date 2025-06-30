@@ -248,8 +248,8 @@ unsigned auth_read(struct selector_key *key) {
 
     log(INFO, "Received authentication request for user: %s", username);
 
-    // Here will go the call to the function that checks the username and password
-    uint8_t auth_status = 0x00; // Assume success for now
+    // Call to the function that checks the username and password
+    uint8_t auth_status = credentials_are_valid(username, password);
 
     // Build the response
     buffer_reset(&connection->write_buffer);

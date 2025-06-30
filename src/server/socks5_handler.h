@@ -6,6 +6,7 @@
 #include "selector.h"
 #include "buffer.h"
 #include "stm.h"
+#include "user_auth_utils.h"
 
 #define BUFFER_SIZE 4096
 
