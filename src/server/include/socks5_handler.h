@@ -3,9 +3,19 @@
 
 #include <stdint.h>
 #include <sys/socket.h>
+#include <stddef.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <unistd.h>
 #include "selector.h"
 #include "buffer.h"
 #include "stm.h"
+#include "../../utils/logger.h"
 
 #define BUFFER_SIZE 4096
 #define SOCKS5_VERSION 0x05

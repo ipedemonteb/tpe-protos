@@ -1,18 +1,4 @@
-#include <stddef.h>
-#include <errno.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <netdb.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include "../utils/logger.h"
-#include "buffer.h"
-#include "selector.h"
-#include "socks5_handler.h"
+#include "include/socks5_handler.h"
 
 
 #define SOCKS5_VERSION 0x05
