@@ -8,14 +8,18 @@
 #include "stm.h"
 
 #define BUFFER_SIZE 4096
+#define SOCKS5_VERSION 0x05
+#define NO_AUTH_METHOD 0x00
+#define IPV4_ATYP 0x01
+#define DOMAIN_NAME_ATYP 0x03
+#define IPV6_ATYP 0x04
+#define RSV 0x00
 
 typedef enum {
-    STATE_HELLO_READ = 0,
-    STATE_HELLO_WRITE,
-    STATE_REQUEST_READ,
-    STATE_REQUEST_WRITE,
-    STATE_FORWARD_READ,
-    STATE_FORWARD_WRITE,
+    STATE_HELLO = 0,
+    STATE_REQUEST,
+    STATE_RESPONSE,
+    STATE_FORWARDING,
     STATE_DONE,
     STATE_ERROR,
 } socks5_state;
@@ -25,10 +29,12 @@ typedef struct socks5_connection {
     int origin_fd;
     struct buffer read_buffer;
     struct buffer write_buffer;
-    struct buffer origin_buffer;
+    struct buffer origin_read_buffer;
+    struct buffer origin_write_buffer;
     uint8_t raw_read[BUFFER_SIZE];
     uint8_t raw_write[BUFFER_SIZE];
-    uint8_t raw_origin[BUFFER_SIZE];
+    uint8_t raw_origin_read[BUFFER_SIZE];
+    uint8_t raw_origin_write[BUFFER_SIZE];
     struct state_machine stm;
 } socks5_connection;
 
