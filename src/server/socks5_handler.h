@@ -22,6 +22,8 @@ typedef enum {
     STATE_FORWARDING,
     STATE_DONE,
     STATE_ERROR,
+    STATE_AUTH_READ,
+    STATE_AUTH_WRITE,
 } socks5_state;
 
 typedef struct socks5_connection {
