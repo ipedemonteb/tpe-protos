@@ -1,10 +1,8 @@
 #include "include/socks5_handler.h"
+#include <netdb.h>
+#include <stdlib.h>
 
-unsigned error_state(struct selector_key *key);
-unsigned done_state(struct selector_key *key);
-void get_domain_name_and_port(char *host, char *port, struct buffer *read_buff, uint8_t len);
-void write_response(struct buffer *write_buff, uint8_t status, uint8_t atyp);
-int open_socket(const char *host, const char *port, struct addrinfo **res);
+void finish(struct selector_key *key);
 
 static const struct state_definition socks5_states[] = {
     {
@@ -36,19 +34,45 @@ static const struct state_definition socks5_states[] = {
     },
     {
         .state = STATE_ERROR,
-        .on_read_ready = NULL,
-        .on_write_ready = NULL,
     }
 };
 
-unsigned socks5_stm_read(struct selector_key *key) {
-    socks5_connection *conn = key->data;
-    return stm_handler_read(&conn->stm, key);
+void socks5_stm_read(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    const socks5_state current_state = stm_handler_read(&connection->stm, key);
+    if (current_state == STATE_ERROR || current_state == STATE_DONE) {
+        finish(key);
+    }
 }
 
-unsigned socks5_stm_write(struct selector_key *key) {
-    socks5_connection *conn = key->data;
-    return stm_handler_write(&conn->stm, key);
+void socks5_stm_write(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    const socks5_state current_state = stm_handler_write(&connection->stm, key);
+    if (current_state == STATE_ERROR || current_state == STATE_DONE) {
+        finish(key);
+    }
+}
+
+void socks5_stm_block(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    const socks5_state current_state = stm_handler_block(&connection->stm, key);
+    if (current_state == STATE_ERROR || current_state == STATE_DONE) {
+        finish(key);
+    }
+}
+
+void socks5_stm_close(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    if (connection != NULL) {
+        if(connection->references == 1) {
+            if(connection->origin_res != NULL) {
+                freeaddrinfo(connection->origin_res);
+            }
+            free(connection);
+        } else {
+            connection->references--;
+        }
+    }
 }
 
 void accept_connection(struct selector_key *key) {
@@ -95,6 +119,8 @@ void accept_connection(struct selector_key *key) {
     };
     stm_init(&new_connection->stm);
 
+    new_connection->references = 1;
+
     // Register the client socket with the selector
     if(selector_register(selector, client_fd, &socks5_stm_handler, OP_READ, new_connection) != SELECTOR_SUCCESS) {
         log(ERROR, "selector_register() failed for client");
@@ -104,4 +130,21 @@ void accept_connection(struct selector_key *key) {
     }
 
     log(INFO, "New client connected: fd=%d", client_fd);
+}
+
+void finish(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    const int fds[] = {
+        connection->client_fd,
+        connection->origin_fd
+    };
+    for(int i = 0; i < N(fds); i++) {
+        if(fds[i] != -1) {
+            if(selector_unregister_fd(key->s, fds[i]) != SELECTOR_SUCCESS) {
+                log(ERROR, "Failed to unregister fd %d: %s", fds[i], strerror(errno));
+                abort();
+            }
+            //close(fds[i]);
+        }
+    }
 }

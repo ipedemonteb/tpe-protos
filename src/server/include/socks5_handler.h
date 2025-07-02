@@ -32,6 +32,8 @@
 #define IPV6_ATYP 0x04
 #define RSV 0x00
 
+#define N(x) (sizeof(x)/sizeof((x)[0]))
+
 typedef enum {
     STATE_HELLO = 0,
     STATE_AUTH,
@@ -55,16 +57,20 @@ typedef struct socks5_connection {
     uint8_t raw_origin_read[BUFFER_SIZE];
     uint8_t raw_origin_write[BUFFER_SIZE];
     struct state_machine stm;
+    uint8_t references;
 } socks5_connection;
 
 void accept_connection(struct selector_key *key);
-unsigned socks5_stm_read(struct selector_key *key);
-unsigned socks5_stm_write(struct selector_key *key);
+void socks5_stm_read(struct selector_key *key);
+void socks5_stm_write(struct selector_key *key);
+void socks5_stm_block(struct selector_key *key);
+void socks5_stm_close(struct selector_key *key);
 
 static const struct fd_handler socks5_stm_handler = {
     .handle_read = (void (*)(struct selector_key *))socks5_stm_read,
     .handle_write = (void (*)(struct selector_key *))socks5_stm_write,
-    // @TODO: MISING HANDLERS
+    .handle_block = (void (*)(struct selector_key *))socks5_stm_block,
+    .handle_close = (void (*)(struct selector_key *))socks5_stm_close,
 };
 
 #endif

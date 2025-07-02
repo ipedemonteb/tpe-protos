@@ -6,9 +6,16 @@ unsigned forward_read(struct selector_key *key) {
     const bool from_client = key->fd == conn->client_fd;
 
     struct buffer *dst_buf = from_client ? &conn->origin_write_buffer : &conn->write_buffer;
+    if (!buffer_can_write(dst_buf)) {
+        if (selector_set_interest_key(key, OP_NOOP) != SELECTOR_SUCCESS) {
+            log(ERROR, "Failed to set OP_NOOP");
+            return STATE_ERROR;
+        }
+        return STATE_FORWARDING;
+    }
+
     size_t n;
     uint8_t *ptr = buffer_write_ptr(dst_buf, &n);
-
     ssize_t read_bytes = recv(key->fd, ptr, n, 0);
     if(read_bytes < 0) {
         if(errno == EAGAIN || errno == EWOULDBLOCK) return STATE_FORWARDING;
@@ -37,9 +44,16 @@ unsigned forward_write(struct selector_key *key) {
     const bool to_client = key->fd == conn->client_fd;
 
     struct buffer *src_buf = to_client ? &conn->write_buffer : &conn->origin_write_buffer;
+    if (!buffer_can_read(src_buf)) {
+        if (selector_set_interest_key(key, OP_NOOP) != SELECTOR_SUCCESS) {
+            log(ERROR, "Failed to set OP_NOOP in forward_write");
+            return STATE_ERROR;
+        }
+        return STATE_FORWARDING;
+    }
+
     size_t n;
     uint8_t *ptr = buffer_read_ptr(src_buf, &n);
-
     ssize_t sent = send(key->fd, ptr, n, 0);
     if(sent < 0) {
         if(errno == EAGAIN || errno == EWOULDBLOCK) return STATE_FORWARDING;

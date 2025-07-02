@@ -2,6 +2,7 @@
 #define STATEREQUEST_H_
 
 #include <stdint.h>
+#include <arpa/inet.h>
 #include "../../include/selector.h"
 #include "state_utils.h"
 

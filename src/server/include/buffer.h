@@ -146,5 +146,7 @@ buffer_can_read(buffer *b);
 bool
 buffer_can_write(buffer *b);
 
+size_t buffer_readable_bytes(buffer *b);
+
 
 #endif

@@ -1,5 +1,6 @@
 #include "include/state_utils.h"
 #include "../include/socks5_handler.h"
+#include <sys/types.h>
 
 void write_response(struct buffer *write_buff, uint8_t status, uint8_t atyp) {
     buffer_reset(write_buff);

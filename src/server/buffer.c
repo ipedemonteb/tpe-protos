@@ -101,3 +101,8 @@ buffer_compact(buffer *b) {
         b->write = b->data + n;
     }
 }
+
+// @TODO: check if valid
+size_t buffer_readable_bytes(buffer *b) {
+    return b->write - b->read;
+}
