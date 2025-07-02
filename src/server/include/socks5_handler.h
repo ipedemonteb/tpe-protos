@@ -12,13 +12,20 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <netdb.h>
 #include "selector.h"
 #include "buffer.h"
 #include "stm.h"
 #include "../../utils/logger.h"
+#include "../states/include/state_hello.h"
+#include "../states/include/state_connect.h"
+#include "../states/include/state_auth.h"
+#include "../states/include/state_request.h"
+#include "../states/include/state_forward.h"
 
 #define BUFFER_SIZE 4096
 #define SOCKS5_VERSION 0x05
+#define AUTH_VERSION 0x01
 #define NO_AUTH_METHOD 0x00
 #define IPV4_ATYP 0x01
 #define DOMAIN_NAME_ATYP 0x03
@@ -29,7 +36,7 @@ typedef enum {
     STATE_HELLO = 0,
     STATE_AUTH,
     STATE_REQUEST,
-    STATE_RESPONSE,
+    STATE_CONNECT,
     STATE_FORWARDING,
     STATE_DONE,
     STATE_ERROR,
@@ -38,6 +45,7 @@ typedef enum {
 typedef struct socks5_connection {
     int client_fd;
     int origin_fd;
+    struct addrinfo *origin_res;
     struct buffer read_buffer;
     struct buffer write_buffer;
     struct buffer origin_read_buffer;
@@ -50,8 +58,13 @@ typedef struct socks5_connection {
 } socks5_connection;
 
 void accept_connection(struct selector_key *key);
-void socks5_read(struct selector_key *key);
-void socks5_write(struct selector_key *key);
-void socks5_close(struct selector_key *key);
+unsigned socks5_stm_read(struct selector_key *key);
+unsigned socks5_stm_write(struct selector_key *key);
+
+static const struct fd_handler socks5_stm_handler = {
+    .handle_read = (void (*)(struct selector_key *))socks5_stm_read,
+    .handle_write = (void (*)(struct selector_key *))socks5_stm_write,
+    // @TODO: MISING HANDLERS
+};
 
 #endif

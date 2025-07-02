@@ -1,4 +1,4 @@
-SRC_DIRS := src/server src/utils
+SRC_DIRS := src/server src/server/states src/utils
 
 SRCS := $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)/*.c))
 
