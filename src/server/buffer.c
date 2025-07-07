@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <assert.h>
 
-#include "buffer.h"
+#include "include/buffer.h"
 
 inline void
 buffer_reset(buffer *b) {
@@ -100,4 +100,9 @@ buffer_compact(buffer *b) {
         b->read  = b->data;
         b->write = b->data + n;
     }
+}
+
+// @TODO: check if valid
+size_t buffer_readable_bytes(buffer *b) {
+    return b->write - b->read;
 }

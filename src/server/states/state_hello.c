@@ -1,0 +1,83 @@
+#include "include/state_hello.h"
+#include "../include/socks5_handler.h"
+
+unsigned hello_read(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    if (connection == NULL) {
+        log(ERROR, "Connection data is NULL");
+        selector_unregister_fd(key->s, key->fd);
+        close(key->fd);
+        return STATE_ERROR;
+    }
+
+    size_t n;
+    uint8_t *ptr = buffer_write_ptr(&connection->read_buffer, &n);
+    ssize_t read = recv(connection->client_fd, ptr, n, 0);
+    if (read < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return STATE_HELLO;
+        }
+        log(ERROR, "recv() failed: %s", strerror(errno));
+        return STATE_ERROR;
+    } else if (read == 0) {
+        log(INFO, "Client closed connection during HELLO");
+        return STATE_DONE;
+    }
+
+    buffer_write_adv(&connection->read_buffer, read);
+
+    size_t available;
+    uint8_t *read_ptr = buffer_read_ptr(&connection->read_buffer, &available);
+    if (available < 2) {
+        return STATE_HELLO;
+    }
+
+    uint8_t version = buffer_read(&connection->read_buffer);
+    if(version != SOCKS5_VERSION) {
+        log(ERROR, "Unsupported SOCKS version: %d", version);
+        return STATE_ERROR;
+    }
+    uint8_t nmethods = buffer_read(&connection->read_buffer);
+    if (nmethods == 0 || nmethods > 255) {
+        log(ERROR, "Invalid number of methods: %d", nmethods);
+        return STATE_ERROR;
+    }
+    if (available < (2 + nmethods)) {
+        return STATE_HELLO;
+    }
+    for (int i = 0; i < nmethods && buffer_can_read(&connection->read_buffer); i++) {
+        // Methods, not used for the moment
+        buffer_read(&connection->read_buffer);
+    }
+
+    // Build the response
+    buffer_reset(&connection->write_buffer);
+    buffer_write(&connection->write_buffer, SOCKS5_VERSION);
+    buffer_write(&connection->write_buffer, NO_AUTH_METHOD);
+
+    selector_set_interest_key(key, OP_WRITE);
+    return STATE_HELLO;
+}
+
+unsigned hello_write(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    size_t n;
+    uint8_t *ptr = buffer_read_ptr(&connection->write_buffer, &n);
+    if(n == 0) {
+        return STATE_HELLO;
+    }
+    ssize_t sent = send(connection->client_fd, ptr, n, 0);
+    if (sent < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return STATE_HELLO;
+        }
+        log(ERROR, "send() failed in hello_write: %s (errno: %d)", strerror(errno), errno);
+        return STATE_ERROR;
+    }
+    buffer_read_adv(&connection->write_buffer, sent);
+    if (buffer_can_read(&connection->write_buffer)) {
+        return STATE_HELLO;
+    }
+    selector_set_interest_key(key, OP_READ);
+    return STATE_REQUEST;
+}

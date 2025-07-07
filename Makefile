@@ -1,7 +1,7 @@
-SRC_DIRS := src/server src/utils src/monitor
+SRC_DIRS := src/server src/server/states src/utils src/monitor
 
 # Servidores principales (SOCKS5 y servidor monitoreo)
-SERVER_SRCS := $(wildcard src/server/*.c) $(wildcard src/utils/*.c) $(filter-out src/monitor/monitor_client.c, $(wildcard src/monitor/*.c))
+SERVER_SRCS := $(wildcard src/server/*.c) $(wildcard src/server/states/*.c) $(wildcard src/utils/*.c) $(filter-out src/monitor/monitor_client.c, $(wildcard src/monitor/*.c))
 SERVER_OBJS := $(SERVER_SRCS:.c=.o)
 
 # Monitoreo (cliente)

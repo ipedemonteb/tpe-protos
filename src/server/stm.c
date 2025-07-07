@@ -2,8 +2,7 @@
  * stm.c - pequeño motor de maquina de estados donde los eventos son los
  *         del selector.c
  */
-#include <stdlib.h>
-#include "stm.h"
+#include "include/stm.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 

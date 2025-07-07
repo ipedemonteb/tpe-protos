@@ -6,8 +6,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include "../utils/logger.h"
-#include "../server/buffer.h"
-#include "../server/selector.h"
+#include "../server/include/buffer.h"
+#include "../server/include/selector.h"
 #include "monitor_handler.h"
 #include "metrics.h"
 

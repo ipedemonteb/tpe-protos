@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include <sys/socket.h>
-#include "../server/selector.h"
-#include "../server/buffer.h"
+#include "../server/include/selector.h"
+#include "../server/include/buffer.h"
 
 #define MONITOR_BUFFER_SIZE 1024
 #define MAX_COMMAND_SIZE 256

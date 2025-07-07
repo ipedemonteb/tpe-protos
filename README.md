@@ -105,7 +105,7 @@ Celestino Garrós (64375) - cgarros@itba.edu.ar
 
 Ignacio Pedemonte Berthoud (64908) - ipedemonteberthoud@itba.edu.ar
 
-Federico Ignacio Ruckauf () - fruckauf@itba.edu.ar
+Federico Ignacio Ruckauf (64356) - fruckauf@itba.edu.ar
 
 Leo Weitz (64365) - lweitz@itba.edu.ar
 
