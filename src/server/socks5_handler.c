@@ -4,11 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <netinet/in.h>
 #include <unistd.h>
 #include "../utils/logger.h"
 #include "buffer.h"
 #include "selector.h"
 #include "socks5_handler.h"
+#include "../monitor/metrics.h"
 
 #define SOCKS5_VERSION 0x05
 #define NO_AUTH_METHOD 0x00
@@ -19,7 +21,7 @@ int handle_hello_write(struct buffer *write_buff, int fd);
 static const struct fd_handler socks5_handler = {
     .handle_read = socks5_read,
     .handle_write = socks5_write,
-    //.handle_close = socks5_close,
+    .handle_close = socks5_close,
 };
 
 void accept_connection(struct selector_key *key) {
@@ -65,7 +67,22 @@ void accept_connection(struct selector_key *key) {
         return;
     }
 
-    log(INFO, "New client connected: fd=%d", client_fd);
+    metrics_connection_start();
+    
+    char client_ip[INET6_ADDRSTRLEN];
+    if (client_addr.ss_family == AF_INET) {
+        struct sockaddr_in *s = (struct sockaddr_in *)&client_addr;
+        //Esta función transforma la dirección IP binaria (s.sin_addr) en una cadena de texto, guardándola en client_ip
+        inet_ntop(AF_INET, &s->sin_addr, client_ip, sizeof(client_ip));
+    } else {
+        struct sockaddr_in6 *s = (struct sockaddr_in6 *)&client_addr;
+        inet_ntop(AF_INET6, &s->sin6_addr, client_ip, sizeof(client_ip));
+    }
+    
+    // @todo: añadir al usuario real cuando sea implementado
+    metrics_add_user("anonymous", client_ip);
+
+    log(INFO, "New SOCKS client connected: fd=%d, ip=%s", client_fd, client_ip);
 }
 
 void socks5_read(struct selector_key *key) {
@@ -74,6 +91,7 @@ void socks5_read(struct selector_key *key) {
         log(ERROR, "Connection data is NULL");
         selector_unregister_fd(key->s, key->fd);
         close(key->fd);
+        return;
     }
 
     switch(connection->state) {
@@ -128,6 +146,21 @@ void socks5_write(struct selector_key *key) {
             selector_set_interest_key(key, OP_NOOP);
             break;
     }
+}
+
+void socks5_close(struct selector_key *key) {
+    if(key->data != NULL) {
+        socks5_connection *connection = key->data;
+        
+        metrics_connection_end();
+        
+        // @todo: implementar para usuarios cuando los tengamos
+        metrics_remove_user("anonymous");
+        
+        free(connection);
+    }
+    close(key->fd);
+    log(INFO, "SOCKS client disconnected: fd=%d", key->fd);
 }
 
 int handle_hello_read(struct buffer *read_buff, int fd, struct buffer *write_buff) {
