@@ -1,22 +1,31 @@
-SRC_DIRS := src/server src/utils
+SRC_DIRS := src/server src/utils src/monitor
 
-SRCS := $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)/*.c))
+# Servidores principales (SOCKS5 y servidor monitoreo)
+SERVER_SRCS := $(wildcard src/server/*.c) $(wildcard src/utils/*.c) $(filter-out src/monitor/monitor_client.c, $(wildcard src/monitor/*.c))
+SERVER_OBJS := $(SERVER_SRCS:.c=.o)
 
-OBJS := $(SRCS:.c=.o)
+# Monitoreo (cliente)
+CLIENT_SRCS := src/monitor/monitor_client.c
+CLIENT_OBJS := $(CLIENT_SRCS:.c=.o)
 
 TARGET := server
+CLIENT_TARGET := monitor_client
 
 CC := gcc
+CFLAGS := -Wall -Wextra -g -pthread
 
-# CFLAGS := -Wall -Wextra -g
+all: $(TARGET) $(CLIENT_TARGET)
 
-all: $(TARGET)
+$(TARGET): $(SERVER_OBJS)
+	$(CC) -o $@ $^ -pthread
 
-$(TARGET): $(OBJS)
+$(CLIENT_TARGET): $(CLIENT_OBJS)
 	$(CC) -o $@ $^
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(SERVER_OBJS) $(CLIENT_OBJS) $(TARGET) $(CLIENT_TARGET)
+
+.PHONY: all clean
