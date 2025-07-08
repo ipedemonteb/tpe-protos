@@ -304,8 +304,8 @@ void handle_connections_command(monitor_connection *conn) {
     int max_allowed = metrics_get_max_connections();
     
     snprintf(conn->response, MAX_RESPONSE_SIZE, 
-             "OK current:%lu max:%lu allowed:%d\n",
-             current_conn, max_conn, max_allowed);
+             "OK current:%lu max:%lu\n",
+             current_conn, max_conn);
 }
 
 void handle_users_command(monitor_connection *conn) {
