@@ -13,10 +13,10 @@ static unsigned long _hash(const char *str)
 hashmap_t *rehash(hashmap_t *map, size_t new_capacity)
 {
     if (new_capacity <= map->capacity)
-        return map; 
+        return map;
     static_entry *new_entries = malloc(sizeof(static_entry) * new_capacity);
     if (!new_entries)
-        return NULL; 
+        return NULL;
     for (size_t i = 0; i < map->capacity; i++)
     {
         if (map->entries[i].present)
@@ -85,18 +85,15 @@ int hashmap_insert(hashmap_t *map, const char *key, const char *value)
 
 const static_entry *hashmap_get(const hashmap_t *map, const char *key)
 {
-    for (size_t i = 0; i < map->capacity; i++) {
-        printf("%d: Key: %s, Value: %s\n", i, map->entries[i].key, map->entries[i].value);
-    }
     unsigned long hash = _hash(key);
     int position = hash % map->capacity;
-    printf("\n\n\nSearching for key: %s at position: %d\n", key, position);
     while (map->entries[position].present && position < (map->capacity - 1) && strcmp(key, map->entries[position].key))
-        {position++;
-        }
-        if (map->entries[position].present && !strcmp(key, map->entries[position].key))
-    {    printf("Checking position: %d\n", position);
+    {
+        position++;
+    }
+    if (map->entries[position].present && !strcmp(key, map->entries[position].key))
+    {
         return &(map->entries[position]);
-    }printf("\n\nKey not found: %s\n", key);
+    }
     return NULL;
 }

@@ -17,6 +17,18 @@ void free_user_credentials()
     }
 }
 
+void printHash() {
+    if (user_credentials == NULL) {
+        printf("No user credentials loaded.\n");
+        return;
+    }
+    for (size_t i = 0; i < user_credentials->capacity; i++) {
+        if (user_credentials->entries[i].present) {
+            printf("i : %d Key: %s, Value: %s\n", i, user_credentials->entries[i].key, user_credentials->entries[i].value);
+        }
+    }
+}
+
 static int _fetch_user_credentials()
 {
     user_credentials = malloc(sizeof(hashmap_t));
@@ -33,8 +45,10 @@ static int _fetch_user_credentials()
         user_credentials = NULL;
         return -1;
     }
-    fread(user_credentials->entries, sizeof(static_entry), user_credentials->size, file);
+    fread(user_credentials->entries, sizeof(static_entry), user_credentials->capacity, file);
     fclose(file);
+
+    printHash();
     return 0;
 }
 
@@ -60,7 +74,9 @@ static int _persist_user_credentials()
         return -1;
     }
     fclose(file);
+    printf("User credentials persisted successfully.\n");
     return 0;
+    
 }
 
 uint8_t credentials_are_valid(const char *username, const char *password)
@@ -72,18 +88,9 @@ uint8_t credentials_are_valid(const char *username, const char *password)
 
     const static_entry *user_password = hashmap_get(user_credentials, username);
     if (user_password == NULL){
-        printf("\n\n\nAdding new user: %s\n\n\n", username);
         hashmap_insert(user_credentials, username, password);
-        printf("\nHICE EL INSERT\n");
-
-        for (size_t i = 0; i < user_credentials->capacity; i++) {
-            printf("Key: %s, Value: %s\n", user_credentials->entries[i].key, user_credentials->entries[i].value);
-        }
-        user_password = hashmap_get(user_credentials, username);
-        printf("abc");
-        printf("\n\n\n Stored pass: %s for user: %s\n\n\n", user_password->value, user_password->key);
         _persist_user_credentials();
-        printf("\n\n\nUser %s added successfully\n\n\n", username);
+        printHash();
         return 0x00;
     }
     else if (strcmp(user_password->value, password) == 0)
