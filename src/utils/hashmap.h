@@ -2,6 +2,8 @@
 #define __HASHMAP_H__
 
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
 //porque el protocolo socks5 da 8bits para definir el largo del user/pass
 #define ENTRY_LENGTH 255 
@@ -9,7 +11,7 @@
 typedef struct static_entry {
     char key[ENTRY_LENGTH];
     char value[ENTRY_LENGTH];
-    int present
+    int present;
 } static_entry;
 
 typedef struct hashmap {
