@@ -12,27 +12,33 @@ static uint64_t current_connections = 0;
 static uint64_t max_concurrent_connections = 0;
 static uint64_t total_bytes_transferred = 0;
 static time_t server_start_time = 0;
+static struct selector_init *config;
 
 static user_info active_users[MAX_USERS];
 static int user_count = 0;
 
 static int timeout_seconds = 30;
-static int max_connections = 500;
+static int max_connections = 1;
 
-void metrics_init() {
+void metrics_init(struct selector_init *conf) {
+    config = conf;
     server_start_time = time(NULL);
     memset(active_users, 0, sizeof(active_users));
     user_count = 0;
 }
 
-void metrics_connection_start() {
+int metrics_connection_start() {
     pthread_mutex_lock(&metrics_mutex);
+    if (current_connections >= max_connections) {
+        return 1;
+    }
     total_connections++;
     current_connections++;
     if (current_connections > max_concurrent_connections) {
         max_concurrent_connections = current_connections;
     }
     pthread_mutex_unlock(&metrics_mutex);
+    return 0;
 }
 
 void metrics_connection_end() {
@@ -134,17 +140,27 @@ void metrics_get_users(user_info *users, int max_users) {
 }
 
 int metrics_get_timeout() {
-    return timeout_seconds;
+    pthread_mutex_lock(&metrics_mutex);
+    int timeout = (int) config->select_timeout.tv_sec;
+    pthread_mutex_unlock(&metrics_mutex);
+    return timeout;
 }
 
 void metrics_set_timeout(int seconds) {
-    timeout_seconds = seconds;
+    pthread_mutex_lock(&metrics_mutex);
+    config->select_timeout.tv_sec = seconds;
+    pthread_mutex_unlock(&metrics_mutex);
 }
 
 int metrics_get_max_connections() {
-    return max_connections;
+    pthread_mutex_lock(&metrics_mutex);
+    int current_max_connections = max_connections;
+    pthread_mutex_unlock(&metrics_mutex);
+    return current_max_connections;
 }
 
 void metrics_set_max_connections(int max) {
+    pthread_mutex_lock(&metrics_mutex);
     max_connections = max;
+    pthread_mutex_unlock(&metrics_mutex);
 } 

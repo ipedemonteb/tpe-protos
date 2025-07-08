@@ -49,7 +49,16 @@ int main(int argc, char *argv[]) {
 }
 
 int init_server(char *serv_port, char *monitor_port) {
-    metrics_init();
+    // Selector Configuration
+    struct selector_init conf = {
+        .signal = SIGALRM,
+        .select_timeout = {
+            .tv_sec = 10,
+            .tv_nsec = 0,
+        },
+    };
+
+    metrics_init(&conf);
     
     int ret = 0;
     const char *err_msg = NULL;
@@ -70,14 +79,6 @@ int init_server(char *serv_port, char *monitor_port) {
         goto finally;
     }
 
-    // Selector Configuration
-    struct selector_init conf = {
-        .signal = SIGALRM,
-        .select_timeout = {
-            .tv_sec = 10,
-            .tv_nsec = 0,
-        },
-    };
 
     // Initialize the selector
     if (selector_init(&conf) != SELECTOR_SUCCESS) {

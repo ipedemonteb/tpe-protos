@@ -352,14 +352,6 @@ void handle_config_command(monitor_connection *conn, const char *args) {
             } else {
                 snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Invalid timeout value\n");
             }
-        } else if (strcmp(param, "max_connections") == 0) {
-            int max_conn = atoi(value);
-            if (max_conn > 0) {
-                metrics_set_max_connections(max_conn);
-                snprintf(conn->response, MAX_RESPONSE_SIZE, "OK max_connections set to %d\n", max_conn);
-            } else {
-                snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Invalid max_connections value\n");
-            }
         } else {
             snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Unknown config parameter: %s\n", param);
         }
