@@ -64,7 +64,7 @@ int init_server(char *serv_port, char *monitor_port) {
     }
 
     // Initialize the monitor socket
-    int monitor_sock = setupTCPServerSocket(monitor_port);
+    int monitor_sock = setup_TCP_server_socket(monitor_port);
     if (monitor_sock < 0 ) {
         err_msg = "Failed to initialize monitor socket";
         goto finally;
