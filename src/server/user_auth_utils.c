@@ -69,7 +69,7 @@ static int _persist_user_credentials()
     file = fopen("user_credentials.bin", "wb");
     if (file == NULL)
         return -1;
-    if (fwrite(user_credentials->entries, sizeof(static_entry), user_credentials->size, file) != user_credentials->size) {
+    if (fwrite(user_credentials->entries, sizeof(static_entry), user_credentials->size, file) != user_credentials->capacity) {
         fclose(file);
         return -1;
     }
