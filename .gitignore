@@ -59,5 +59,6 @@ cmake_install.cmake
 CMakeCache.txt
 CMakeFiles
 
-# Serialized data structures
+.gitignore
+
 *.bin

@@ -56,8 +56,8 @@ int init_server(char *serv_port, char *monitor_port) {
     selector_status ss = SELECTOR_SUCCESS;
     fd_selector selector = NULL;
 
-    // Initialize the SOCKS socket
-    int serv_sock = setupTCPServerSocket(serv_port);
+    // Initialize the socket
+    int serv_sock = setup_TCP_server_socket(serv_port);
     if (serv_sock < 0 ) {
         err_msg = "Failed to initialize SOCKS5 socket";
         goto finally;

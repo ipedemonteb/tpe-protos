@@ -1,5 +1,6 @@
 #include "include/state_connect.h"
 #include "../include/socks5_handler.h"
+#include "include/state_utils.h"
 
 unsigned connect_write(struct selector_key *key) {
     socks5_connection *connection = key->data;
@@ -17,7 +18,7 @@ unsigned connect_write(struct selector_key *key) {
         return STATE_ERROR;
     }
 
-    write_response(&connection->write_buffer, 0x00, IPV4_ATYP);  // o DOMAIN/IPv6 según corresponda
+    write_response(&connection->write_buffer, SUCCESS, connection->origin_atyp, connection->origin_host, connection->origin_port);  
     if (connection->origin_res) {
         freeaddrinfo(connection->origin_res);
         connection->origin_res = NULL;

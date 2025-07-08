@@ -74,15 +74,21 @@ void socks5_stm_block(struct selector_key *key) {
 
 void socks5_stm_close(struct selector_key *key) {
     socks5_connection *connection = key->data;
-    if (connection != NULL) {
-        if(connection->references == 1) {
-            if(connection->origin_res != NULL) {
-                freeaddrinfo(connection->origin_res);
-            }
-            free(connection);
-        } else {
-            connection->references--;
-        }
+    if (connection == NULL) {
+        return;
+    }
+
+    if (connection->origin_res != NULL) {
+        freeaddrinfo(connection->origin_res);
+        connection->origin_res = NULL;
+    }
+
+    if (connection->references > 0) {
+        connection->references--;
+    }
+
+    if (connection->references == 0) {
+        free(connection);
     }
 }
 
@@ -176,7 +182,7 @@ void finish(struct selector_key *key) {
                 log(ERROR, "Failed to unregister fd %d: %s", fds[i], strerror(errno));
                 abort();
             }
-            //close(fds[i]);
+            close(fds[i]);
         }
     }
 }

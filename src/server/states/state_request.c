@@ -1,7 +1,5 @@
 #include "../include/socks5_handler.h"
-
-#define HOST_MAX_LEN 256
-#define PORT_MAX_LEN 6
+#include "include/state_utils.h"
 
 int get_ipv4_address(struct buffer *buff, char *host, char *port);
 int get_domain_name(char *host, char *port, struct buffer *buff);
@@ -35,16 +33,13 @@ unsigned request_read(struct selector_key *key) {
 
     // Only support CONNECT command for now
     uint8_t cmd = buffer_read(&connection->read_buffer);
-    if(cmd != 0x01) {
-        log(ERROR, "Unsupported command: %d", cmd);
-        return STATE_ERROR;
-    }
     // Reserved
     buffer_read(&connection->read_buffer);
+    // ATYP (Address Type)
+    uint8_t atyp = buffer_read(&connection->read_buffer);
 
     char host[HOST_MAX_LEN] = {0};
     char port[PORT_MAX_LEN] = {0};
-    uint8_t atyp = buffer_read(&connection->read_buffer);
     int result = -1;
     switch (atyp) {
         case IPV4_ATYP: {
@@ -60,10 +55,23 @@ unsigned request_read(struct selector_key *key) {
             break;
         default:
             log(ERROR, "Unsupported address type: %d", atyp);
-            return STATE_ERROR;
+            write_response(&connection->write_buffer, UNSUPPORTED_ATYP, atyp, host, port);
+            selector_set_interest_key(key, OP_WRITE);
+            return STATE_REQUEST;
     }
     if (result < 0) {
         log(INFO, "Request message incomplete, waiting for more bytes");
+        return STATE_REQUEST;
+    }
+
+    connection->origin_atyp = atyp;
+    strncpy(connection->origin_host, host, HOST_MAX_LEN - 1);
+    strncpy(connection->origin_port, port, PORT_MAX_LEN - 1);
+
+    if(cmd != CONNECT_CMD) {
+        log(ERROR, "Unsupported command: %d", cmd);
+        write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
+        selector_set_interest_key(key, OP_WRITE);
         return STATE_REQUEST;
     }
 
@@ -73,7 +81,9 @@ unsigned request_read(struct selector_key *key) {
     struct addrinfo *res;
     connection->origin_fd = open_socket(host, port, &res);
     if (connection->origin_fd == -1) {
-        return STATE_ERROR;
+        write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
+        selector_set_interest_key(key, OP_WRITE);
+        return STATE_REQUEST;
     }
     connection->origin_res = res;
 
@@ -86,9 +96,10 @@ unsigned request_read(struct selector_key *key) {
     if (connect(connection->origin_fd, res->ai_addr, res->ai_addrlen) == -1) {
         if (errno != EINPROGRESS) {
             log(ERROR, "connect() failed: %s", strerror(errno));
+            write_response(&connection->write_buffer, CONNECTION_REFUSED, atyp, host, port);
             close(connection->origin_fd);
             freeaddrinfo(res);
-            return STATE_ERROR;
+            return STATE_REQUEST;
         }
 
         connection->references++;
@@ -103,7 +114,7 @@ unsigned request_read(struct selector_key *key) {
     }
 
     freeaddrinfo(res);
-    write_response(&connection->write_buffer, 0x00, atyp);
+    write_response(&connection->write_buffer, SUCCESS, atyp, host, port);
     selector_set_interest_key(key, OP_WRITE);
     return STATE_REQUEST;
 }
@@ -148,7 +159,6 @@ int get_ipv4_address(struct buffer *buff, char *host, char *port) {
     snprintf(port, 6, "%u", port_num);
     return 0;
 }
-
 
 int get_domain_name(char *host, char *port, struct buffer *buff) {
     if (buffer_readable_bytes(buff) < 1) {
