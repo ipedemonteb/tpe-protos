@@ -51,7 +51,7 @@ int init_server(char *serv_port) {
     fd_selector selector = NULL;
 
     // Initialize the socket
-    int serv_sock = setupTCPServerSocket(serv_port);
+    int serv_sock = setup_TCP_server_socket(serv_port);
     if (serv_sock < 0 ) {
         err_msg = "Failed to initialize socket";
         goto finally;

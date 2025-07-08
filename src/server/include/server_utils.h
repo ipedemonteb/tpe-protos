@@ -15,6 +15,6 @@
 
 
 // Create, bind, and listen a new TCP server socket
-int setupTCPServerSocket(const char *service);
+int setup_TCP_server_socket(const char *service);
 
 #endif 

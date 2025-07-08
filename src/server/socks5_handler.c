@@ -144,7 +144,7 @@ void finish(struct selector_key *key) {
                 log(ERROR, "Failed to unregister fd %d: %s", fds[i], strerror(errno));
                 abort();
             }
-            //close(fds[i]);
+            close(fds[i]);
         }
     }
 }
