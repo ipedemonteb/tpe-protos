@@ -84,7 +84,6 @@ Por defecto se conecta a localhost:9090.
 - `USERS`: Lista usuarios activos
 - `CONFIG <param> <value>`: Cambia configuración en tiempo real
   - `CONFIG timeout 30`: Cambia el timeout a 30 segundos
-  - `CONFIG max_connections 1000`: Cambia el máximo de conexiones a 1000
 - `quit`: Sale del cliente
 
 <p align="right">(<a href="#tpe---protocolos-de-comunicación">Volver</a>)</p>

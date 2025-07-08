@@ -1,6 +1,7 @@
 #ifndef METRICS_H_
 #define METRICS_H_
 
+#include "../server/include/selector.h"
 #include <stdint.h>
 #include <time.h>
 
@@ -14,9 +15,9 @@ typedef struct {
     time_t last_seen;
 } user_info;
 
-void metrics_init();
+void metrics_init(struct selector_init *conf);
 
-void metrics_connection_start();
+int metrics_connection_start();
 void metrics_connection_end();
 void metrics_bytes_transferred(uint64_t bytes);
 
@@ -31,7 +32,6 @@ time_t metrics_get_server_uptime();
 int metrics_get_user_count();
 void metrics_get_users(user_info *users, int max_users);
 
-//@todo: falta poder setear variables?
 int metrics_get_timeout();
 void metrics_set_timeout(int seconds);
 int metrics_get_max_connections();
