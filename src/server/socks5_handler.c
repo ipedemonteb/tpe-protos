@@ -1,106 +1,79 @@
-#include <stddef.h>
-#include <errno.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <fcntl.h>
+#include "include/socks5_handler.h"
 #include <netdb.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include "../utils/logger.h"
-#include "buffer.h"
-#include "socks5_handler.h"
+#include <stdlib.h>
 
-
-#define SOCKS5_VERSION 0x05
-#define AUTH_VERSION 0x01
-#define NO_AUTH_METHOD 0x00
-#define IPV4_ATYP 0x01
-#define DOMAIN_NAME_ATYP 0x03
-#define IPV6_ATYP 0x04
-#define RSV 0x00
-
-unsigned hello_read(struct selector_key *key);
-unsigned hello_write(struct selector_key *key);
-unsigned request_read(struct selector_key *key);
-unsigned request_write(struct selector_key *key);
-unsigned forward_read(struct selector_key *key);
-unsigned forward_write(struct selector_key *key);
-unsigned error_state(struct selector_key *key);
-unsigned done_state(struct selector_key *key);
-uint16_t get_domain_name_and_port(char *host, struct buffer *read_buff);
-void write_response(struct buffer *write_buff, uint8_t status, uint8_t atyp);
-int open_connection(socks5_connection *conn, const char *host, uint16_t port, fd_selector selector);
+void finish(struct selector_key *key);
 
 static const struct state_definition socks5_states[] = {
-    [STATE_HELLO_READ] = {
-        .state = STATE_HELLO_READ,
+    {
+        .state = STATE_HELLO,
         .on_read_ready = hello_read,
-        .on_write_ready = NULL,
-    },
-    [STATE_HELLO_WRITE] = {
-        .state = STATE_HELLO_WRITE,
-        .on_read_ready = NULL,
         .on_write_ready = hello_write,
     },
-    [STATE_REQUEST_READ] = {
-        .state = STATE_REQUEST_READ,
-        .on_read_ready = request_read,
-        .on_write_ready = NULL,
-    },
-    [STATE_REQUEST_WRITE] = {
-        .state = STATE_REQUEST_WRITE,
-        .on_read_ready = NULL,
-        .on_write_ready = request_write,
-    },
-    [STATE_FORWARD_READ] = {
-        .state = STATE_FORWARD_READ,
-        .on_read_ready = forward_read,
-        .on_write_ready = NULL,
-    },
-    [STATE_FORWARD_WRITE] = {
-        .state = STATE_FORWARD_WRITE,
-        .on_read_ready = NULL,
-        .on_write_ready = forward_write,
-    },
-    [STATE_DONE] = {
-        .state = STATE_DONE,
-        .on_read_ready = NULL,
-        .on_write_ready = NULL,
-    },
-    [STATE_ERROR] = {
-        .state = STATE_ERROR,
-        .on_read_ready = NULL,
-        .on_write_ready = NULL,
-    },
-    [STATE_AUTH_READ] = {
-        .state = STATE_AUTH_READ,
+    {
+        .state = STATE_AUTH,
         .on_read_ready = auth_read,
         .on_write_ready = NULL,
     },
-    [STATE_AUTH_WRITE] = {
-        .state = STATE_AUTH_WRITE,
-        .on_read_ready = NULL,
-        .on_write_ready = NULL,
+    {
+        .state = STATE_REQUEST,
+        .on_read_ready = request_read,
+        .on_write_ready = request_write,
+    },
+    {
+        .state = STATE_CONNECT,
+        .on_write_ready = connect_write,
+    },
+    {
+        .state = STATE_FORWARDING,
+        .on_read_ready = forward_read,
+        .on_write_ready = forward_write,
+    },
+    {
+        .state = STATE_DONE,
+    },
+    {
+        .state = STATE_ERROR,
     }
 };
 
-unsigned socks5_stm_read(struct selector_key *key) {
-    socks5_connection *conn = key->data;
-    return stm_handler_read(&conn->stm, key);
+void socks5_stm_read(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    const socks5_state current_state = stm_handler_read(&connection->stm, key);
+    if (current_state == STATE_ERROR || current_state == STATE_DONE) {
+        finish(key);
+    }
 }
 
-unsigned socks5_stm_write(struct selector_key *key) {
-    socks5_connection *conn = key->data;
-    return stm_handler_write(&conn->stm, key);
+void socks5_stm_write(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    const socks5_state current_state = stm_handler_write(&connection->stm, key);
+    if (current_state == STATE_ERROR || current_state == STATE_DONE) {
+        finish(key);
+    }
 }
 
-static const struct fd_handler socks5_stm_handler = {
-    .handle_read = (void (*)(struct selector_key *))socks5_stm_read,
-    .handle_write = (void (*)(struct selector_key *))socks5_stm_write,
-};
+void socks5_stm_block(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    const socks5_state current_state = stm_handler_block(&connection->stm, key);
+    if (current_state == STATE_ERROR || current_state == STATE_DONE) {
+        finish(key);
+    }
+}
+
+void socks5_stm_close(struct selector_key *key) {
+    socks5_connection *connection = key->data;
+    if (connection != NULL) {
+        if(connection->references == 1) {
+            if(connection->origin_res != NULL) {
+                freeaddrinfo(connection->origin_res);
+            }
+            free(connection);
+        } else {
+            connection->references--;
+        }
+    }
+}
 
 void accept_connection(struct selector_key *key) {
     int server_fd = key->fd;
@@ -112,6 +85,7 @@ void accept_connection(struct selector_key *key) {
     int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
     if(client_fd < 0) {
         log(ERROR, "accept() failed: %s", strerror(errno));
+        close(client_fd);
         return;
     }
 
@@ -134,15 +108,18 @@ void accept_connection(struct selector_key *key) {
 
     buffer_init(&new_connection->read_buffer,  BUFFER_SIZE, new_connection->raw_read);
     buffer_init(&new_connection->write_buffer, BUFFER_SIZE, new_connection->raw_write);
-    buffer_init(&new_connection->origin_buffer, BUFFER_SIZE, new_connection->raw_origin);
+    buffer_init(&new_connection->origin_read_buffer,  BUFFER_SIZE, new_connection->raw_origin_read);
+    buffer_init(&new_connection->origin_write_buffer, BUFFER_SIZE, new_connection->raw_origin_write);
 
     new_connection->stm = (struct state_machine){
         .states = socks5_states,
-        .max_state = sizeof(socks5_states) / sizeof(socks5_states[0]) - 1,
-        .initial = STATE_HELLO_READ,
+        .max_state = STATE_ERROR,
+        .initial = STATE_HELLO,
         .current = NULL,
     };
     stm_init(&new_connection->stm);
+
+    new_connection->references = 1;
 
     // Register the client socket with the selector
     if(selector_register(selector, client_fd, &socks5_stm_handler, OP_READ, new_connection) != SELECTOR_SUCCESS) {
@@ -155,209 +132,19 @@ void accept_connection(struct selector_key *key) {
     log(INFO, "New client connected: fd=%d", client_fd);
 }
 
-unsigned hello_read(struct selector_key *key) {
+void finish(struct selector_key *key) {
     socks5_connection *connection = key->data;
-    if(connection == NULL) {
-        log(ERROR, "Connection data is NULL");
-        selector_unregister_fd(key->s, key->fd);
-        close(key->fd);
-        return STATE_ERROR;
-    }
-
-    size_t n;
-    uint8_t *ptr = buffer_write_ptr(&connection->read_buffer, &n);
-
-    ssize_t read = recv(connection->client_fd, ptr, n, 0);
-    if(read < 0) {
-        log(ERROR, "recv() failed: %s", strerror(errno));
-        return STATE_ERROR;
-    } else if (read == 0) {
-        log(INFO, "Client closed connection");
-        return STATE_DONE;
-    }
-
-    buffer_write_adv(&connection->read_buffer, read);
-
-    if(buffer_can_read(&connection->read_buffer)) {
-        uint8_t version = buffer_read(&connection->read_buffer);
-        if(version != SOCKS5_VERSION) {
-            log(ERROR, "Unsupported SOCKS version: %d", version);
-            return STATE_ERROR;
+    const int fds[] = {
+        connection->client_fd,
+        connection->origin_fd
+    };
+    for(int i = 0; i < N(fds); i++) {
+        if(fds[i] != -1) {
+            if(selector_unregister_fd(key->s, fds[i]) != SELECTOR_SUCCESS) {
+                log(ERROR, "Failed to unregister fd %d: %s", fds[i], strerror(errno));
+                abort();
+            }
+            //close(fds[i]);
         }
-        uint8_t nmethods = buffer_read(&connection->read_buffer);
-        for (int i = 0; i < nmethods && buffer_can_read(&connection->read_buffer); i++) {
-            // Methods, not used for the moment
-            buffer_read(&connection->read_buffer);
-        }
-
-        // Build the response
-        buffer_reset(&connection->write_buffer);
-        buffer_write(&connection->write_buffer, SOCKS5_VERSION);
-        buffer_write(&connection->write_buffer, NO_AUTH_METHOD);
     }
-    selector_set_interest_key(key, OP_WRITE);
-    return STATE_HELLO_WRITE;
-}
-
-unsigned hello_write(struct selector_key *key) {
-    socks5_connection *connection = key->data;
-    size_t n;
-    uint8_t *ptr = buffer_read_ptr(&connection->write_buffer, &n);
-    ssize_t sent = send(connection->client_fd, ptr, n, 0);
-    if(sent < 0) {
-        log(ERROR, "send() failed: %s", strerror(errno));
-        return -1;
-    }
-    buffer_read_adv(&connection->write_buffer, sent);
-    selector_set_interest_key(key, OP_READ);
-    return STATE_REQUEST_READ;
-}
-
-unsigned auth_read(struct selector_key *key) {
-    socks5_connection *connection = key->data;
-    size_t n;
-    uint8_t *ptr = buffer_write_ptr(&connection->read_buffer, &n);
-
-    ssize_t read = recv(connection->client_fd, ptr, n, 0);
-    if(read < 0) {
-        log(ERROR, "recv() failed: %s", strerror(errno));
-        return -1;
-    }
-    buffer_write_adv(&connection->read_buffer, read);
-
-    if(!buffer_can_read(&connection->read_buffer)) {
-        return 0;
-    }
-
-    if(buffer_read(&connection->read_buffer) != AUTH_VERSION) {
-        log(ERROR, "Unsupported authentication version");
-        return -1;
-    }
-
-    char username[256] = {0};
-    uint8_t ulen = buffer_read(&connection->read_buffer);
-    for(int i = 0; i < ulen && buffer_can_read(&connection->read_buffer); i++) {
-        username[i] = buffer_read(&connection->read_buffer);
-    }
-
-    char password[256] = {0};
-    uint8_t plen = buffer_read(&connection->read_buffer);
-    for(int i = 0; i < plen && buffer_can_read(&connection->read_buffer); i++) {
-        password[i] = buffer_read(&connection->read_buffer);
-    }
-
-    log(INFO, "Received authentication request for user: %s", username);
-
-    // Call to the function that checks the username and password
-    uint8_t auth_status = credentials_are_valid(username, password);
-
-    // Build the response
-    buffer_reset(&connection->write_buffer);
-    buffer_write(&connection->write_buffer, AUTH_VERSION);
-    buffer_write(&connection->write_buffer, auth_status);
-
-    if (auth_status == 0x00) {
-        log(INFO, "Authentication successful for user: %s", username);
-        return STATE_AUTH_WRITE;
-    } else {
-        log(ERROR, "Authentication failed for user: %s", username);
-        // Still write the response even if auth fails, but it should go to a different state, in which it closes the connection
-        return STATE_AUTH_WRITE; 
-    }
-}
-
-unsigned request_read(struct selector_key *key) {
-    socks5_connection *connection = key->data;
-    size_t n;
-    uint8_t *ptr = buffer_write_ptr(&connection->read_buffer, &n);
-
-    ssize_t read = recv(connection->client_fd, ptr, n, 0);
-    if(read < 0) {
-        log(ERROR, "recv() failed: %s", strerror(errno));
-        return -1;
-    }
-    buffer_write_adv(&connection->read_buffer, read);
-
-    if(!buffer_can_read(&connection->read_buffer)) {
-        return 0;
-    }
-
-    if(buffer_read(&connection->read_buffer) != SOCKS5_VERSION) {
-        log(ERROR, "Unsupported SOCKS version in request");
-        return -1;
-    }
-    // Only support CONNECT command for now
-    uint8_t cmd = buffer_read(&connection->read_buffer);
-    if(cmd != 0x01) {
-        log(ERROR, "Unsupported command: %d", cmd);
-        return -1;
-    }
-    buffer_read(&connection->read_buffer); //reserved
-
-    char host [256] = {0};
-    uint16_t port = 0;
-    uint8_t atyp = buffer_read(&connection->read_buffer);
-    switch(atyp) {
-        case IPV4_ATYP:
-            break;
-        case DOMAIN_NAME_ATYP:
-            port = get_domain_name_and_port(host, &connection->read_buffer);
-            break;
-        case IPV6_ATYP:
-            break;
-        default:
-            log(ERROR, "Unsupported address type: %d", atyp);
-            return -1;
-    }
-    log(INFO, "Connecting to %s:%d", host, port);
-
-    if(open_connection(connection, host, port, ) != 0) {
-        log(ERROR, "Failed to open connection to %s:%d", host, port);
-        return -1;
-    }
-
-    write_response(&connection->write_buffer, 0x00, atyp);
-    return STATE_REQUEST_WRITE;
-}
-
-uint16_t get_domain_name_and_port(char *host, struct buffer *read_buff) {
-    uint8_t domain_length = buffer_read(read_buff);
-    for(int i = 0; i < domain_length && buffer_can_read(read_buff); i++) {
-        host[i] = buffer_read(read_buff);
-    }
-    uint16_t port = buffer_read(read_buff) << 8;
-    port |= buffer_read(read_buff);
-    return port;
-}
-
-void write_response(struct buffer *write_buff, uint8_t status, uint8_t atyp) {
-    // @TODO: Finish
-    buffer_reset(write_buff);
-    buffer_write(write_buff, SOCKS5_VERSION);
-    buffer_write(write_buff, status);
-    buffer_write(write_buff, RSV);
-    buffer_write(write_buff, atyp);
-    buffer_write(write_buff, 0);
-    buffer_write(write_buff, 0);
-    buffer_write(write_buff, 0);
-    buffer_write(write_buff, 0);
-    buffer_write(write_buff, 0);
-    buffer_write(write_buff, 0);
-}
-
-int open_connection(socks5_connection *conn, const char *host, uint16_t port, fd_selector selector) {
-    
-    return 0;
-}
-
-unsigned request_write(struct selector_key *key) {
-    return STATE_FORWARD_READ;
-}
-
-unsigned forward_read(struct selector_key *key) {
-    return STATE_FORWARD_WRITE;
-}
-
-unsigned forward_write(struct selector_key *key) {
-    return STATE_FORWARD_READ;
 }
