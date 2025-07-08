@@ -1,5 +1,4 @@
 #include "include/state_auth.h"
-#include "../include/socks5_handler.h"
 
 unsigned auth_read(struct selector_key *key) {
     socks5_connection *connection = key->data;
@@ -39,13 +38,57 @@ unsigned auth_read(struct selector_key *key) {
 
     log(INFO, "Received authentication request for user: %s", username);
 
-    // Here will go the call to the function that checks the username and password
-    uint8_t auth_status = 0x00; // Assume success for now
-
+    // Check credentials
+    uint8_t auth_status = credentials_are_valid(username, password);
+    
     // Build the response
     buffer_reset(&connection->write_buffer);
     buffer_write(&connection->write_buffer, AUTH_VERSION);
     buffer_write(&connection->write_buffer, auth_status);
+    
+    selector_set_interest_key(key, OP_WRITE);
+    
+    if (auth_status != 0x00) {
+        log(INFO, "Invalid credentials for user: %s", username);
+        return STATE_AUTH_FAILED;
+    }
 
+    log(INFO, "Authentication successful for user: %s", username);
+    return STATE_AUTH;    
+}
+
+static unsigned auth_write_aux(struct selector_key *key, uint8_t auth_status, unsigned current_state) {
+    socks5_connection *connection = key->data;
+    size_t n;
+    uint8_t *ptr = buffer_read_ptr(&connection->write_buffer, &n);
+    if(n == 0) {
+        return STATE_AUTH;
+    }
+    ssize_t sent = send(connection->client_fd, ptr, n, 0);
+    if (sent < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return current_state;
+        }
+        log(ERROR, "send() failed in auth_write: %s (errno: %d)", strerror(errno), errno);
+        return STATE_ERROR;
+    }
+    buffer_read_adv(&connection->write_buffer, sent);
+    if (buffer_can_read(&connection->write_buffer)) {
+        return current_state;
+    }
+
+    if (auth_status != 0x00) {
+        return STATE_DONE;
+    }
+
+    selector_set_interest_key(key, OP_READ);
     return STATE_REQUEST;
+}
+                         
+unsigned auth_write(struct selector_key *key) {
+    return auth_write_aux(key, 0x00, STATE_AUTH);
+}
+
+unsigned auth_failed_write(struct selector_key *key) {
+    return auth_write_aux(key, 0x01, STATE_AUTH_FAILED);
 }

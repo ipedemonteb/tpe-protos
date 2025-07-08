@@ -45,39 +45,55 @@ unsigned hello_read(struct selector_key *key) {
     if (available < (2 + nmethods)) {
         return STATE_HELLO;
     }
+    uint8_t chosen_method = NO_AUTH_METHOD; // Default to no authentication
     for (int i = 0; i < nmethods && buffer_can_read(&connection->read_buffer); i++) {
-        // Methods, not used for the moment
-        buffer_read(&connection->read_buffer);
+        if (buffer_read(&connection->read_buffer) == AUTH_METHOD) {
+            chosen_method = AUTH_METHOD;
+        }
     }
 
     // Build the response
     buffer_reset(&connection->write_buffer);
     buffer_write(&connection->write_buffer, SOCKS5_VERSION);
-    buffer_write(&connection->write_buffer, NO_AUTH_METHOD);
+    buffer_write(&connection->write_buffer, chosen_method);
 
     selector_set_interest_key(key, OP_WRITE);
+
+    if (chosen_method == AUTH_METHOD) {
+        log(INFO, "Client supports authentication, switching to AUTH state");
+        return STATE_HELLO_TO_AUTH;
+    }
+
     return STATE_HELLO;
 }
 
-unsigned hello_write(struct selector_key *key) {
+static unsigned hello_write_aux(struct selector_key *key, unsigned next_state, unsigned current_state) {
     socks5_connection *connection = key->data;
     size_t n;
     uint8_t *ptr = buffer_read_ptr(&connection->write_buffer, &n);
     if(n == 0) {
-        return STATE_HELLO;
+        return current_state;
     }
     ssize_t sent = send(connection->client_fd, ptr, n, 0);
     if (sent < 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return STATE_HELLO;
+            return current_state;
         }
         log(ERROR, "send() failed in hello_write: %s (errno: %d)", strerror(errno), errno);
         return STATE_ERROR;
     }
     buffer_read_adv(&connection->write_buffer, sent);
     if (buffer_can_read(&connection->write_buffer)) {
-        return STATE_HELLO;
+        return current_state;
     }
     selector_set_interest_key(key, OP_READ);
-    return STATE_REQUEST;
+    return next_state;
+}
+
+unsigned hello_write(struct selector_key *key) {
+    return hello_write_aux(key, STATE_REQUEST, STATE_HELLO);
+}
+
+unsigned hello_to_auth_write(struct selector_key *key) {
+    return hello_write_aux(key, STATE_AUTH, STATE_HELLO_TO_AUTH);
 }

@@ -1,7 +1,7 @@
-#include "include/socks5_handler.h"
-#include "../monitor/metrics.h"
 #include <netdb.h>
 #include <stdlib.h>
+#include "include/socks5_handler.h"
+#include "../monitor/metrics.h"
 
 void finish(struct selector_key *key);
 
@@ -12,9 +12,19 @@ static const struct state_definition socks5_states[] = {
         .on_write_ready = hello_write,
     },
     {
+        .state = STATE_HELLO_TO_AUTH,
+        .on_read_ready = NULL,
+        .on_write_ready = hello_to_auth_write,
+    },
+    {
         .state = STATE_AUTH,
         .on_read_ready = auth_read,
-        .on_write_ready = NULL,
+        .on_write_ready = auth_write,
+    },
+    {
+        .state = STATE_AUTH_FAILED,
+        .on_read_ready = NULL,
+        .on_write_ready = auth_failed_write,
     },
     {
         .state = STATE_REQUEST,
