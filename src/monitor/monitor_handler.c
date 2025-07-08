@@ -1,0 +1,369 @@
+#include <stddef.h>
+#include <errno.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include "../utils/logger.h"
+#include "../server/include/buffer.h"
+#include "../server/include/selector.h"
+#include "monitor_handler.h"
+#include "metrics.h"
+
+#define MONITOR_BANNER "SOCKS-MONITOR"
+#define MONITOR_VERSION "1.0"
+
+static const struct fd_handler monitor_handler = {
+    .handle_read = monitor_read,
+    .handle_write = monitor_write,
+    .handle_close = monitor_close,
+};
+
+void monitor_accept_connection(struct selector_key *key) {
+    int server_fd = key->fd;
+    fd_selector selector = key->data;
+    struct sockaddr_storage client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+
+    // Accept a new connection
+    int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+    if(client_fd < 0) {
+        log(ERROR, "monitor accept() failed: %s", strerror(errno));
+        return;
+    }
+
+    // Set the client socket to non-blocking
+    if(selector_fd_set_nio(client_fd) == -1) {
+        log(ERROR, "Failed to set monitor client socket to non-blocking: %s", strerror(errno));
+        close(client_fd);
+        return;
+    }
+
+    // Monitor connection structure
+    monitor_connection *new_connection = malloc(sizeof(monitor_connection));
+    if(new_connection == NULL) {
+        log(ERROR, "Failed to allocate memory for new monitor connection");
+        close(client_fd);
+        return;
+    }
+    
+    new_connection->state = MONITOR_HANDSHAKE_READ;
+    new_connection->client_fd = client_fd;
+    new_connection->handshake_done = 0;
+    memset(new_connection->command, 0, MAX_COMMAND_SIZE);
+    memset(new_connection->response, 0, MAX_RESPONSE_SIZE);
+
+    buffer_init(&new_connection->read_buffer, MONITOR_BUFFER_SIZE, new_connection->raw_read);
+    buffer_init(&new_connection->write_buffer, MONITOR_BUFFER_SIZE, new_connection->raw_write);
+
+    // Register the client socket with the selector
+    if(selector_register(selector, client_fd, &monitor_handler, OP_READ, new_connection) != SELECTOR_SUCCESS) {
+        log(ERROR, "selector_register() failed for monitor client");
+        close(client_fd);
+        free(new_connection);
+        return;
+    }
+
+    log(INFO, "New monitor client connected: fd=%d", client_fd);
+}
+
+void monitor_read(struct selector_key *key) {
+    monitor_connection *connection = key->data;
+    if(connection == NULL) {
+        log(ERROR, "Monitor connection data is NULL");
+        selector_unregister_fd(key->s, key->fd);
+        close(key->fd);
+        return;
+    }
+
+    switch(connection->state) {
+        case MONITOR_HANDSHAKE_READ:
+            if(handle_monitor_handshake_read(&connection->read_buffer, key->fd, &connection->write_buffer) != 0) {
+                connection->state = MONITOR_ERROR_STATE;
+                selector_set_interest_key(key, OP_NOOP);
+                return;
+            }
+            connection->state = MONITOR_HANDSHAKE_WRITE;
+            selector_set_interest_key(key, OP_WRITE);
+            break;
+        case MONITOR_COMMAND_READ:
+            if(handle_monitor_command_read(&connection->read_buffer, key->fd, &connection->write_buffer, connection) != 0) {
+                connection->state = MONITOR_ERROR_STATE;
+                selector_set_interest_key(key, OP_NOOP);
+                return;
+            }
+            if(connection->state == MONITOR_COMMAND_WRITE) {
+                selector_set_interest_key(key, OP_WRITE);
+            }
+            break;
+        default:
+            log(ERROR, "Unknown state in monitor_read: %d", connection->state);
+            connection->state = MONITOR_ERROR_STATE;
+            selector_set_interest_key(key, OP_NOOP);
+            break;
+    }
+}
+
+void monitor_write(struct selector_key *key) {
+    monitor_connection *connection = key->data;
+    if(connection == NULL) {
+        log(ERROR, "Monitor connection data is NULL");
+        selector_unregister_fd(key->s, key->fd);
+        close(key->fd);
+        return;
+    }
+
+    switch(connection->state) {
+        case MONITOR_HANDSHAKE_WRITE:
+            if(handle_monitor_handshake_write(&connection->write_buffer, key->fd) != 0) {
+                connection->state = MONITOR_ERROR_STATE;
+                selector_set_interest_key(key, OP_NOOP);
+                return;
+            }
+            if(!buffer_can_read(&connection->write_buffer)) {
+                connection->state = MONITOR_COMMAND_READ;
+                connection->handshake_done = 1;
+                selector_set_interest_key(key, OP_READ);
+            }
+            break;
+        case MONITOR_COMMAND_WRITE:
+            if(handle_monitor_command_write(&connection->write_buffer, key->fd) != 0) {
+                connection->state = MONITOR_ERROR_STATE;
+                selector_set_interest_key(key, OP_NOOP);
+                return;
+            }
+            if(!buffer_can_read(&connection->write_buffer)) {
+                connection->state = MONITOR_COMMAND_READ;
+                selector_set_interest_key(key, OP_READ);
+            }
+            break;
+        default:
+            log(ERROR, "Unexpected state in monitor_write: %d", connection->state);
+            selector_set_interest_key(key, OP_NOOP);
+            break;
+    }
+}
+
+void monitor_close(struct selector_key *key) {
+    if(key->data != NULL) {
+        free(key->data);
+    }
+    close(key->fd);
+    log(INFO, "Monitor client disconnected: fd=%d", key->fd);
+}
+
+int handle_monitor_handshake_read(struct buffer *read_buff, int fd, struct buffer *write_buff) {
+    size_t n;
+    uint8_t *ptr = buffer_write_ptr(read_buff, &n);
+
+    ssize_t read = recv(fd, ptr, n, 0);
+    if(read < 0) {
+        log(ERROR, "monitor recv() failed: %s", strerror(errno));
+        return -1;
+    }
+    buffer_write_adv(read_buff, read);
+
+    if(buffer_can_read(read_buff)) {
+        // @todo: por ahora acepto cualquier texto del cliente y hago el handshake, falta parsear el banner + versión + headers del cliente
+        // ...
+
+        buffer_reset(write_buff);
+        char response[256];
+        snprintf(response, sizeof(response), "%s %s\n", MONITOR_BANNER, MONITOR_VERSION);
+        
+        //@todo: chequear si hay una mejor forma
+        /*
+        size_t n = MAX_RESPONSE_SIZE;
+        uint8_t *ptr = buffer_write_ptr(write_buff, &n);
+        strcpy(ptr, response);
+        buffer_write_adv(write_buff, strlen(ptr));
+        */
+        //------------------
+        size_t response_len = strlen(response);
+        for(size_t i = 0; i < response_len; i++) {
+            buffer_write(write_buff, response[i]);
+        }
+        //----------
+
+        //@todo: chequear...debería?
+        buffer_reset(read_buff);
+    }
+    return 0;
+}
+
+int handle_monitor_handshake_write(struct buffer *write_buff, int fd) {
+    size_t n;
+    uint8_t *ptr = buffer_read_ptr(write_buff, &n);
+    ssize_t sent = send(fd, ptr, n, 0);
+    if(sent < 0) {
+        log(ERROR, "monitor send() failed: %s", strerror(errno));
+        return -1;
+    }
+    buffer_read_adv(write_buff, sent);
+    return 0;
+}
+
+int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer *write_buff, monitor_connection *conn) {
+    size_t n;
+    uint8_t *ptr = buffer_write_ptr(read_buff, &n);
+
+    ssize_t read = recv(fd, ptr, n, 0);
+    if(read < 0) {
+        log(ERROR, "monitor command recv() failed: %s", strerror(errno));
+        return -1;
+    }
+    buffer_write_adv(read_buff, read);
+
+    if(buffer_can_read(read_buff)) {
+        char line[256];
+        int line_len = 0;
+        
+        //@todo: chequear
+        while(buffer_can_read(read_buff) && line_len < 255) {
+            char c = buffer_read(read_buff);
+            if(c == '\n') {
+                line[line_len] = '\0';
+                break;
+            }
+            line[line_len++] = c;
+        }
+        
+        if(line_len > 0) {
+            strncpy(conn->command, line, MAX_COMMAND_SIZE - 1);
+            conn->command[MAX_COMMAND_SIZE - 1] = '\0';
+            
+            // Process command
+            char *space = strchr(conn->command, ' ');
+            if(space != NULL) {
+                *space = '\0';
+                char *args = space + 1;
+                
+                if(strcmp(conn->command, "STATS") == 0) {
+                    handle_stats_command(conn);
+                } else if(strcmp(conn->command, "CONNECTIONS") == 0) {
+                    handle_connections_command(conn);
+                } else if(strcmp(conn->command, "USERS") == 0) {
+                    handle_users_command(conn);
+                } else if(strcmp(conn->command, "CONFIG") == 0) {
+                    handle_config_command(conn, args);
+                } else {
+                    snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Unknown command: %s\n", conn->command);
+                }
+            } else {
+                if(strcmp(conn->command, "STATS") == 0) {
+                    handle_stats_command(conn);
+                } else if(strcmp(conn->command, "CONNECTIONS") == 0) {
+                    handle_connections_command(conn);
+                } else if(strcmp(conn->command, "USERS") == 0) {
+                    handle_users_command(conn);
+                } else {
+                    snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Unknown command: %s\n", conn->command);
+                }
+            }
+            
+            // Prepare response
+            //@todo: chequear
+            buffer_reset(write_buff);
+            size_t response_len = strlen(conn->response);
+            for(size_t i = 0; i < response_len; i++) {
+                buffer_write(write_buff, conn->response[i]);
+            }
+            
+            conn->state = MONITOR_COMMAND_WRITE;
+        }
+    }
+    return 0;
+}
+
+int handle_monitor_command_write(struct buffer *write_buff, int fd) {
+    size_t n;
+    uint8_t *ptr = buffer_read_ptr(write_buff, &n);
+    ssize_t sent = send(fd, ptr, n, 0);
+    if(sent < 0) {
+        log(ERROR, "monitor command send() failed: %s", strerror(errno));
+        return -1;
+    }
+    buffer_read_adv(write_buff, sent);
+    return 0;
+}
+
+void handle_stats_command(monitor_connection *conn) {
+    uint64_t total_conn = metrics_get_total_connections();
+    uint64_t current_conn = metrics_get_current_connections();
+    uint64_t max_conn = metrics_get_max_concurrent_connections();
+    uint64_t total_bytes = metrics_get_total_bytes_transferred();
+    int user_count = metrics_get_user_count();
+    time_t uptime = metrics_get_server_uptime();
+    
+    snprintf(conn->response, MAX_RESPONSE_SIZE, 
+             "OK connections:%lu bytes:%lu users:%d concurrent:%lu max_concurrent:%lu uptime:%ld\n",
+             total_conn, total_bytes, user_count, current_conn, max_conn, uptime);
+}
+
+void handle_connections_command(monitor_connection *conn) {
+    uint64_t current_conn = metrics_get_current_connections();
+    uint64_t max_conn = metrics_get_max_concurrent_connections();
+    int max_allowed = metrics_get_max_connections();
+    
+    snprintf(conn->response, MAX_RESPONSE_SIZE, 
+             "OK current:%lu max:%lu allowed:%d\n",
+             current_conn, max_conn, max_allowed);
+}
+
+void handle_users_command(monitor_connection *conn) {
+    user_info users[100];
+    int count = metrics_get_user_count();
+    metrics_get_users(users, 100);
+    
+    if (count == 0) {
+        snprintf(conn->response, MAX_RESPONSE_SIZE, "OK No active users\n");
+        return;
+    }
+    
+    char user_list[512] = "OK ";
+    int pos = 4;
+    
+    for (int i = 0; i < count && pos < 500; i++) {
+        int written = snprintf(user_list + pos, sizeof(user_list) - pos, 
+                              "%s:%s ", users[i].username, users[i].ip_address);
+        if (written > 0) {
+            pos += written;
+        }
+    }
+    
+    if (pos > 4) {
+        user_list[pos-1] = '\n';
+        user_list[pos] = '\0';
+    }
+    
+    strncpy(conn->response, user_list, MAX_RESPONSE_SIZE - 1);
+    conn->response[MAX_RESPONSE_SIZE - 1] = '\0';
+}
+
+void handle_config_command(monitor_connection *conn, const char *args) {
+    char param[64], value[64];
+    if (sscanf(args, "%63s %63s", param, value) == 2) {
+        if (strcmp(param, "timeout") == 0) {
+            int timeout = atoi(value);
+            if (timeout > 0) {
+                metrics_set_timeout(timeout);
+                snprintf(conn->response, MAX_RESPONSE_SIZE, "OK timeout set to %d\n", timeout);
+            } else {
+                snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Invalid timeout value\n");
+            }
+        } else if (strcmp(param, "max_connections") == 0) {
+            int max_conn = atoi(value);
+            if (max_conn > 0) {
+                metrics_set_max_connections(max_conn);
+                snprintf(conn->response, MAX_RESPONSE_SIZE, "OK max_connections set to %d\n", max_conn);
+            } else {
+                snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Invalid max_connections value\n");
+            }
+        } else {
+            snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Unknown config parameter: %s\n", param);
+        }
+    } else {
+        snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Usage: CONFIG <param> <value>\n");
+    }
+} 

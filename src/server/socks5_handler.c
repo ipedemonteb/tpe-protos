@@ -1,4 +1,5 @@
 #include "include/socks5_handler.h"
+#include "../monitor/metrics.h"
 #include <netdb.h>
 #include <stdlib.h>
 
@@ -129,11 +130,32 @@ void accept_connection(struct selector_key *key) {
         return;
     }
 
-    log(INFO, "New client connected: fd=%d", client_fd);
+    metrics_connection_start();
+    
+    char client_ip[INET6_ADDRSTRLEN];
+    if (client_addr.ss_family == AF_INET) {
+        struct sockaddr_in *s = (struct sockaddr_in *)&client_addr;
+        //Esta función transforma la dirección IP binaria (s.sin_addr) en una cadena de texto, guardándola en client_ip
+        inet_ntop(AF_INET, &s->sin_addr, client_ip, sizeof(client_ip));
+    } else {
+        struct sockaddr_in6 *s = (struct sockaddr_in6 *)&client_addr;
+        inet_ntop(AF_INET6, &s->sin6_addr, client_ip, sizeof(client_ip));
+    }
+    
+    // @todo: añadir al usuario real cuando sea implementado
+    metrics_add_user("anonymous", client_ip);
+
+    log(INFO, "New SOCKS client connected: fd=%d, ip=%s", client_fd, client_ip);
 }
 
 void finish(struct selector_key *key) {
     socks5_connection *connection = key->data;
+    
+    metrics_connection_end();
+
+    //@todo: implementar para usuarios cuando los tengamos
+    metrics_remove_user("anonymous");
+
     const int fds[] = {
         connection->client_fd,
         connection->origin_fd
