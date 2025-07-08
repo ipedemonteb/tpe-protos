@@ -9,6 +9,15 @@
 
 hashmap_t *user_credentials = NULL;
 
+void free_user_credentials()
+{
+    if (user_credentials)
+    {
+        destroy_hashmap(user_credentials);
+        user_credentials = NULL;
+    }
+}
+
 static int _fetch_user_credentials()
 {
     user_credentials = malloc(sizeof(hashmap_t));
