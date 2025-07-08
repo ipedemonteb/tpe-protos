@@ -48,23 +48,26 @@ void monitor_accept_connection(struct selector_key *key) {
         return;
     }
     
-    new_connection->state = MONITOR_HANDSHAKE_READ;
-    new_connection->client_fd = client_fd;
-    new_connection->handshake_done = 0;
-    memset(new_connection->command, 0, MAX_COMMAND_SIZE);
-    memset(new_connection->response, 0, MAX_RESPONSE_SIZE);
-
     buffer_init(&new_connection->read_buffer, MONITOR_BUFFER_SIZE, new_connection->raw_read);
     buffer_init(&new_connection->write_buffer, MONITOR_BUFFER_SIZE, new_connection->raw_write);
+    memset(new_connection->command, 0, MAX_COMMAND_SIZE);
+    memset(new_connection->response, 0, MAX_RESPONSE_SIZE);
+    new_connection->client_fd = client_fd;
+    new_connection->handshake_done = 0;
+    new_connection->state = MONITOR_HANDSHAKE_WRITE;
 
-    // Register the client socket with the selector
-    if(selector_register(selector, client_fd, &monitor_handler, OP_READ, new_connection) != SELECTOR_SUCCESS) {
+    const char *banner = "SOCKS-MONITOR 1.0\n";
+    size_t banner_len = strlen(banner);
+    for(size_t i = 0; i < banner_len; i++) {
+        buffer_write(&new_connection->write_buffer, banner[i]);
+    }
+
+    if(selector_register(selector, client_fd, &monitor_handler, OP_WRITE, new_connection) != SELECTOR_SUCCESS) {
         log(ERROR, "selector_register() failed for monitor client");
         close(client_fd);
         free(new_connection);
         return;
     }
-
     log(INFO, "New monitor client connected: fd=%d", client_fd);
 }
 
@@ -79,13 +82,10 @@ void monitor_read(struct selector_key *key) {
 
     switch(connection->state) {
         case MONITOR_HANDSHAKE_READ:
-            if(handle_monitor_handshake_read(&connection->read_buffer, key->fd, &connection->write_buffer) != 0) {
-                connection->state = MONITOR_ERROR_STATE;
-                selector_set_interest_key(key, OP_NOOP);
-                return;
+            if(handle_monitor_handshake_read(&connection->read_buffer, key->fd, &connection->write_buffer) == 0) {
+                connection->state = MONITOR_COMMAND_READ;
+                selector_set_interest_key(key, OP_READ);
             }
-            connection->state = MONITOR_HANDSHAKE_WRITE;
-            selector_set_interest_key(key, OP_WRITE);
             break;
         case MONITOR_COMMAND_READ:
             if(handle_monitor_command_read(&connection->read_buffer, key->fd, &connection->write_buffer, connection) != 0) {
@@ -122,8 +122,7 @@ void monitor_write(struct selector_key *key) {
                 return;
             }
             if(!buffer_can_read(&connection->write_buffer)) {
-                connection->state = MONITOR_COMMAND_READ;
-                connection->handshake_done = 1;
+                connection->state = MONITOR_HANDSHAKE_READ;
                 selector_set_interest_key(key, OP_READ);
             }
             break;
@@ -164,32 +163,30 @@ int handle_monitor_handshake_read(struct buffer *read_buff, int fd, struct buffe
     }
     buffer_write_adv(read_buff, read);
 
-    if(buffer_can_read(read_buff)) {
-        // @todo: por ahora acepto cualquier texto del cliente y hago el handshake, falta parsear el banner + versión + headers del cliente
-        // ...
-
-        buffer_reset(write_buff);
-        char response[256];
-        snprintf(response, sizeof(response), "%s %s\n", MONITOR_BANNER, MONITOR_VERSION);
-        
-        //@todo: chequear si hay una mejor forma
-        /*
-        size_t n = MAX_RESPONSE_SIZE;
-        uint8_t *ptr = buffer_write_ptr(write_buff, &n);
-        strcpy(ptr, response);
-        buffer_write_adv(write_buff, strlen(ptr));
-        */
-        //------------------
-        size_t response_len = strlen(response);
-        for(size_t i = 0; i < response_len; i++) {
-            buffer_write(write_buff, response[i]);
+    while(buffer_can_read(read_buff)) {
+        char line[64];
+        int line_len = 0;
+        int found_newline = 0;
+        while(buffer_can_read(read_buff) && line_len < 63) {
+            char c = buffer_read(read_buff);
+            if(c == '\n') {
+                line[line_len] = '\0';
+                found_newline = 1;
+                break;
+            }
+            line[line_len++] = c;
         }
-        //----------
-
-        //@todo: chequear...debería?
-        buffer_reset(read_buff);
+        if(!found_newline) {
+            break;
+        }
+        if(strcmp(line, "MONITOR-CLIENT 1.0") == 0) {
+            buffer_reset(read_buff);
+            return 0;
+        } else {
+            log(INFO, "monitor: handshake inválido: '%s' (esperando línea válida)", line);
+        }
     }
-    return 0;
+    return 1;
 }
 
 int handle_monitor_handshake_write(struct buffer *write_buff, int fd) {
