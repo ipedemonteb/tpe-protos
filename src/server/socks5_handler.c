@@ -1,7 +1,7 @@
-#include "include/socks5_handler.h"
-#include "../monitor/metrics.h"
 #include <netdb.h>
 #include <stdlib.h>
+#include "include/socks5_handler.h"
+#include "../monitor/metrics.h"
 
 void finish(struct selector_key *key);
 
@@ -12,9 +12,19 @@ static const struct state_definition socks5_states[] = {
         .on_write_ready = hello_write,
     },
     {
+        .state = STATE_HELLO_TO_AUTH,
+        .on_read_ready = NULL,
+        .on_write_ready = hello_to_auth_write,
+    },
+    {
         .state = STATE_AUTH,
         .on_read_ready = auth_read,
-        .on_write_ready = NULL,
+        .on_write_ready = auth_write,
+    },
+    {
+        .state = STATE_AUTH_FAILED,
+        .on_read_ready = NULL,
+        .on_write_ready = auth_failed_write,
     },
     {
         .state = STATE_REQUEST,
@@ -64,15 +74,21 @@ void socks5_stm_block(struct selector_key *key) {
 
 void socks5_stm_close(struct selector_key *key) {
     socks5_connection *connection = key->data;
-    if (connection != NULL) {
-        if(connection->references == 1) {
-            if(connection->origin_res != NULL) {
-                freeaddrinfo(connection->origin_res);
-            }
-            free(connection);
-        } else {
-            connection->references--;
-        }
+    if (connection == NULL) {
+        return;
+    }
+
+    if (connection->origin_res != NULL) {
+        freeaddrinfo(connection->origin_res);
+        connection->origin_res = NULL;
+    }
+
+    if (connection->references > 0) {
+        connection->references--;
+    }
+
+    if (connection->references == 0) {
+        free(connection);
     }
 }
 
@@ -160,13 +176,13 @@ void finish(struct selector_key *key) {
         connection->client_fd,
         connection->origin_fd
     };
-    for(int i = 0; i < N(fds); i++) {
+    for(int i = 0; i < (int)N(fds); i++) {
         if(fds[i] != -1) {
             if(selector_unregister_fd(key->s, fds[i]) != SELECTOR_SUCCESS) {
                 log(ERROR, "Failed to unregister fd %d: %s", fds[i], strerror(errno));
                 abort();
             }
-            //close(fds[i]);
+            close(fds[i]);
         }
     }
 }
