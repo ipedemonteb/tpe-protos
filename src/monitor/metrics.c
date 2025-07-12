@@ -58,16 +58,16 @@ void metrics_bytes_transferred(uint64_t bytes) {
 void metrics_add_user(const char *username, const char *ip_address) {
     pthread_mutex_lock(&metrics_mutex);
     
-    for (int i = 0; i < user_count; i++) {
-        if (strcmp(active_users[i].username, username) == 0) {
-            strncpy(active_users[i].ip_address, ip_address, sizeof(active_users[i].ip_address) - 1);
-            active_users[i].last_seen = time(NULL);
-            pthread_mutex_unlock(&metrics_mutex);
-            return;
-        }
-    }
-    
     if (user_count < MAX_USERS) {
+        for (int i = 0; i < user_count; i++) {
+            if (strcmp(active_users[i].username, username) == 0) {
+                strncpy(active_users[i].ip_address, ip_address, sizeof(active_users[i].ip_address) - 1);
+                active_users[i].last_seen = time(NULL);
+                pthread_mutex_unlock(&metrics_mutex);
+                return;
+            }
+        }
+    
         strncpy(active_users[user_count].username, username, sizeof(active_users[user_count].username) - 1);
         strncpy(active_users[user_count].ip_address, ip_address, sizeof(active_users[user_count].ip_address) - 1);
         active_users[user_count].last_seen = time(NULL);

@@ -319,15 +319,18 @@ void handle_users_command(monitor_connection *conn) {
     }
     
     char user_list[512] = "OK ";
-    int pos = 4;
+    int pos = 3;
     
     for (int i = 0; i < count && pos < 500; i++) {
-        int written = snprintf(user_list + pos, sizeof(user_list) - pos, 
-                              "%s:%s ", users[i].username, users[i].ip_address);
+        int written = snprintf(user_list + pos, sizeof(user_list) - pos, "%s:%s ", users[i].username, users[i].ip_address);
         if (written > 0) {
+            log(INFO, "User %d: %s:%s", i, users[i].username, users[i].ip_address);
             pos += written;
         }
     }
+
+    log(INFO, "Active users: %d", count);
+    log(INFO, "User list: %s", user_list);
     
     if (pos > 4) {
         user_list[pos-1] = '\n';
