@@ -19,8 +19,6 @@ static struct selector_init *config;
 static user_info active_users[MAX_USERS];
 static int user_count = 0;
 
-static int timeout_seconds = 30;
-static uint64_t max_connections = 1;
 
 void metrics_init(struct selector_init *conf) {
     config = conf;
