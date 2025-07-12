@@ -4,6 +4,7 @@
 #include "../server/include/selector.h"
 #include <stdint.h>
 #include <time.h>
+#include <sys/types.h>
 
 #define MAX_USERNAME_LEN 64
 #define MAX_IP_LEN 46
@@ -19,7 +20,7 @@ void metrics_init(struct selector_init *conf);
 
 int metrics_connection_start();
 void metrics_connection_end();
-void metrics_bytes_transferred(uint64_t bytes);
+void metrics_bytes_transferred(ssize_t bytes);
 
 void metrics_add_user(const char *username, const char *ip_address);
 void metrics_remove_user(const char *username);

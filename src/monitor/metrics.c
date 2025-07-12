@@ -49,7 +49,7 @@ void metrics_connection_end() {
     pthread_mutex_unlock(&metrics_mutex);
 }
 
-void metrics_bytes_transferred(uint64_t bytes) {
+void metrics_bytes_transferred(ssize_t bytes) {
     pthread_mutex_lock(&metrics_mutex);
     total_bytes_transferred += bytes;
     pthread_mutex_unlock(&metrics_mutex);
@@ -152,7 +152,7 @@ void metrics_set_timeout(int seconds) {
     pthread_mutex_unlock(&metrics_mutex);
 }
 
-int metrics_get_MAX_CONNECTIONS() {
+int metrics_get_max_connections() {
     pthread_mutex_lock(&metrics_mutex);
     int current_MAX_CONNECTIONS = MAX_CONNECTIONS;
     pthread_mutex_unlock(&metrics_mutex);

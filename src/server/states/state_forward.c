@@ -1,5 +1,6 @@
 #include "include/state_forward.h"
 #include "../include/socks5_handler.h"
+#include "../../monitor/metrics.h"
 
 unsigned forward_read(struct selector_key *key) {
     socks5_connection *conn = key->data;
@@ -27,6 +28,7 @@ unsigned forward_read(struct selector_key *key) {
     }
 
     buffer_write_adv(dst_buf, read_bytes);
+    metrics_bytes_transferred(read_bytes);
 
     int other_fd = from_client ? conn->origin_fd : conn->client_fd;
     if(selector_set_interest(key->s, other_fd, OP_WRITE) != SELECTOR_SUCCESS) {
@@ -62,6 +64,7 @@ unsigned forward_write(struct selector_key *key) {
     }
 
     buffer_read_adv(src_buf, sent);
+    metrics_bytes_transferred(sent);
 
     if(!buffer_can_read(src_buf)) {
         if(selector_set_interest(key->s, key->fd, OP_READ) != SELECTOR_SUCCESS) {
