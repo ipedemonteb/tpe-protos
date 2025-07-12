@@ -4,6 +4,7 @@
 #include "metrics.h"
 
 #define MAX_USERS 100
+#define MAX_CONNECTIONS 100
 
 static pthread_mutex_t metrics_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -18,7 +19,6 @@ static user_info active_users[MAX_USERS];
 static int user_count = 0;
 
 static int timeout_seconds = 30;
-static int max_connections = 1;
 
 void metrics_init(struct selector_init *conf) {
     config = conf;
@@ -29,7 +29,7 @@ void metrics_init(struct selector_init *conf) {
 
 int metrics_connection_start() {
     pthread_mutex_lock(&metrics_mutex);
-    if (current_connections >= max_connections) {
+    if (current_connections >= MAX_CONNECTIONS) {
         return 1;
     }
     total_connections++;
@@ -152,15 +152,9 @@ void metrics_set_timeout(int seconds) {
     pthread_mutex_unlock(&metrics_mutex);
 }
 
-int metrics_get_max_connections() {
+int metrics_get_MAX_CONNECTIONS() {
     pthread_mutex_lock(&metrics_mutex);
-    int current_max_connections = max_connections;
+    int current_MAX_CONNECTIONS = MAX_CONNECTIONS;
     pthread_mutex_unlock(&metrics_mutex);
-    return current_max_connections;
+    return current_MAX_CONNECTIONS;
 }
-
-void metrics_set_max_connections(int max) {
-    pthread_mutex_lock(&metrics_mutex);
-    max_connections = max;
-    pthread_mutex_unlock(&metrics_mutex);
-} 

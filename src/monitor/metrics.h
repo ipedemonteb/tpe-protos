@@ -35,6 +35,5 @@ void metrics_get_users(user_info *users, int max_users);
 int metrics_get_timeout();
 void metrics_set_timeout(int seconds);
 int metrics_get_max_connections();
-void metrics_set_max_connections(int max);
 
 #endif 
