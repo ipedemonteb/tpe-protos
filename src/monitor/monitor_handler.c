@@ -82,7 +82,7 @@ void monitor_read(struct selector_key *key) {
 
     switch(connection->state) {
         case MONITOR_HANDSHAKE_READ:
-            if(handle_monitor_handshake_read(&connection->read_buffer, key->fd, &connection->write_buffer) == 0) {
+            if(handle_monitor_handshake_read(&connection->read_buffer, key->fd) == 0) {
                 connection->state = MONITOR_COMMAND_READ;
                 selector_set_interest_key(key, OP_READ);
             }
@@ -152,7 +152,7 @@ void monitor_close(struct selector_key *key) {
     log(INFO, "Monitor client disconnected: fd=%d", key->fd);
 }
 
-int handle_monitor_handshake_read(struct buffer *read_buff, int fd, struct buffer *write_buff) {
+int handle_monitor_handshake_read(struct buffer *read_buff, int fd) {
     size_t n;
     uint8_t *ptr = buffer_write_ptr(read_buff, &n);
 
@@ -301,7 +301,6 @@ void handle_stats_command(monitor_connection *conn) {
 void handle_connections_command(monitor_connection *conn) {
     uint64_t current_conn = metrics_get_current_connections();
     uint64_t max_conn = metrics_get_max_concurrent_connections();
-    int max_allowed = metrics_get_max_connections();
     
     snprintf(conn->response, MAX_RESPONSE_SIZE, 
              "OK current:%lu max:%lu\n",

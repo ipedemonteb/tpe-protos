@@ -46,24 +46,10 @@ Esto generará dos ejecutables:
 
 ## Instrucciones:
 
-Una vez ejecutado el código 
-
-### Feature 1:
-
-Para el manejo de memoria, se puede ejecutar el comando ```mem``` 
-
-### Feature 2:
-
-Los procesos...
-
 ### Servidor Principal:
 ```sh
 ./server [puerto_socks] [puerto_monitor]
 ```
-
-Por defecto:
-- Puerto SOCKSv5: 1080
-- Puerto Monitoreo: 9090
 
 Ejemplo:
 ```sh
@@ -84,7 +70,7 @@ Por defecto se conecta a localhost:9090.
 - `USERS`: Lista usuarios activos
 - `CONFIG <param> <value>`: Cambia configuración en tiempo real
   - `CONFIG timeout 30`: Cambia el timeout a 30 segundos
-- `quit`: Sale del cliente
+- `QUIT`: Sale del cliente
 
 <p align="right">(<a href="#tpe---protocolos-de-comunicación">Volver</a>)</p>
 

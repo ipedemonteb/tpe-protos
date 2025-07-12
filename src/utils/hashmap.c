@@ -23,7 +23,7 @@ hashmap_t *rehash(hashmap_t *map, size_t new_capacity)
         {
             unsigned long hash = _hash(map->entries[i].key);
             int position = hash % new_capacity;
-            while (new_entries[position].present && position < (new_capacity - 1))
+            while (new_entries[position].present && position < ((int)new_capacity - 1))
                 position++;
             new_entries[position] = map->entries[i];
         }
@@ -69,7 +69,7 @@ int hashmap_insert(hashmap_t *map, const char *key, const char *value)
 {
     unsigned long hash = _hash(key);
     int position = hash % map->capacity;
-    while (map->entries[position].present && position < (map->capacity - 1))
+    while (map->entries[position].present && position < ((int)map->capacity - 1))
         position++;
     if (!map->entries[position].present)
     {
@@ -81,13 +81,14 @@ int hashmap_insert(hashmap_t *map, const char *key, const char *value)
     }
     rehash(map, map->capacity * 2);
     hashmap_insert(map, key, value);
+    return 0;
 }
 
 const static_entry *hashmap_get(const hashmap_t *map, const char *key)
 {
     unsigned long hash = _hash(key);
     int position = hash % map->capacity;
-    while (map->entries[position].present && position < (map->capacity - 1) && strcmp(key, map->entries[position].key))
+    while (map->entries[position].present && position < ((int)map->capacity - 1) && strcmp(key, map->entries[position].key))
     {
         position++;
     }

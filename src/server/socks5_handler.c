@@ -176,7 +176,7 @@ void finish(struct selector_key *key) {
         connection->client_fd,
         connection->origin_fd
     };
-    for(int i = 0; i < N(fds); i++) {
+    for(int i = 0; i < (int)N(fds); i++) {
         if(fds[i] != -1) {
             if(selector_unregister_fd(key->s, fds[i]) != SELECTOR_SUCCESS) {
                 log(ERROR, "Failed to unregister fd %d: %s", fds[i], strerror(errno));

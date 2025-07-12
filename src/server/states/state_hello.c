@@ -38,11 +38,11 @@ unsigned hello_read(struct selector_key *key) {
         return STATE_ERROR;
     }
     uint8_t nmethods = buffer_read(&connection->read_buffer);
-    if (nmethods == 0 || nmethods > 255) {
+    if (nmethods <= 0) {
         log(ERROR, "Invalid number of methods: %d", nmethods);
         return STATE_ERROR;
     }
-    if (available < (2 + nmethods)) {
+    if ((uint8_t)available < (2 + nmethods)) {
         return STATE_HELLO;
     }
     uint8_t chosen_method = NO_AUTH_METHOD; // Default to no authentication

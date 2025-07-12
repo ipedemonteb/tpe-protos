@@ -24,7 +24,7 @@ void printHash() {
     }
     for (size_t i = 0; i < user_credentials->capacity; i++) {
         if (user_credentials->entries[i].present) {
-            printf("i : %d Key: %s, Value: %s\n", i, user_credentials->entries[i].key, user_credentials->entries[i].value);
+            printf("i : %ld Key: %s, Value: %s\n", i, user_credentials->entries[i].key, user_credentials->entries[i].value);
         }
     }
 }
