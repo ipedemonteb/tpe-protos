@@ -39,6 +39,16 @@ int setupTCPServerSocket(const char *service) {
 			continue;       // Socket creation failed; try next address
 		}
 
+		int opt = true;
+		int disable_v6only=0;
+		setsockopt(servSock, IPPROTO_IPV6, IPV6_V6ONLY, &disable_v6only, sizeof(disable_v6only));
+		
+		//set master socket to allow multiple connections , this is just a good habit, it will work without this
+		if( setsockopt(servSock, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt)) < 0 )
+		{
+			log(ERROR, "set IPv4 socket options failed");
+		}
+
 		// Bind to ALL the address and set socket to listen
 		if ((bind(servSock, addr->ai_addr, addr->ai_addrlen) == 0) && (listen(servSock, MAXPENDING) == 0)) {
 			// Print local address of socket
