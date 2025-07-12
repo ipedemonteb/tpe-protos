@@ -2,6 +2,7 @@
 #include <string.h>
 #include <time.h>
 #include "metrics.h"
+#include "../utils/logger.h"
 
 #define MAX_USERS 100
 #define MAX_CONNECTIONS 100
@@ -149,8 +150,10 @@ int metrics_get_timeout() {
 
 void metrics_set_timeout(int seconds) {
     pthread_mutex_lock(&metrics_mutex);
+    int old_timeout = (int) config->select_timeout.tv_sec;
     config->select_timeout.tv_sec = seconds;
     pthread_mutex_unlock(&metrics_mutex);
+    log(INFO, "Timeout changed from %d to %d seconds", old_timeout, seconds);
 }
 
 int metrics_get_max_connections() {

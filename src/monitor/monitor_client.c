@@ -12,6 +12,7 @@
 #define DEFAULT_MONITOR_HOST "localhost"
 
 int connect_to_monitor(const char *host, const char *port);
+int perform_handshake(int sock);
 void send_command(int sock, const char *command);
 void read_response(int sock);
 
@@ -34,16 +35,28 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    printf("Connected! Type commands (STATS, CONNECTIONS, USERS, CONFIG <param> <value>)\n");
+    printf("Connected! Performing handshake...\n");
+    
+    // Perform handshake
+    if (perform_handshake(sock) != 0) {
+        fprintf(stderr, "Handshake failed\n");
+        close(sock);
+        return 1;
+    }   
+    
+    printf("Handshake successful! Type commands (STATS, CONNECTIONS, USERS, CONFIG <param> <value>)\n");
     printf("Type 'quit' to exit\n\n");
     
     char command[256];
     while (1) {
         printf("monitor> ");
+        fflush(stdout); // Ensure prompt is displayed
+        
         if (fgets(command, sizeof(command), stdin) == NULL) {
             break;
         }
         
+        // Remove newline
         command[strcspn(command, "\n")] = 0;
         
         if (strcmp(command, "quit") == 0) {
@@ -98,6 +111,57 @@ int connect_to_monitor(const char *host, const char *port) {
     }
     
     return sock;
+}
+
+int perform_handshake(int sock) {
+    char buffer[BUFFER_SIZE];
+    
+    // Read server banner
+    ssize_t received = recv(sock, buffer, sizeof(buffer) - 1, 0);
+    if (received <= 0) {
+        fprintf(stderr, "Failed to receive server banner\n");
+        return -1;
+    }
+    buffer[received] = '\0';
+    
+    printf("Server banner: %s", buffer);
+    
+    // Check if banner is correct
+    if (strncmp(buffer, "SOCKS-MONITOR 1.0", 17) != 0) {
+        fprintf(stderr, "Invalid server banner: %s", buffer);
+        return -1;
+    }
+    
+    // Ask user to type the handshake response manually
+    printf("Please type the handshake response: ");
+    fflush(stdout);
+    
+    char user_input[256];
+    while (1) {
+        if (fgets(user_input, sizeof(user_input), stdin) == NULL) {
+            fprintf(stderr, "Failed to read user input\n");
+            return -1;
+        }
+        
+        // Remove newline
+        user_input[strcspn(user_input, "\n")] = 0;
+        
+        // Check if user typed the correct response
+        if (strcmp(user_input, "MONITOR-CLIENT 1.0") == 0) {
+            // Send the correct response
+            const char *response = "MONITOR-CLIENT 1.0\n";
+            ssize_t sent = send(sock, response, strlen(response), 0);
+            if (sent < 0) {
+                fprintf(stderr, "Failed to send handshake response\n");
+                return -1;
+            }
+            printf("Handshake response sent successfully!\n");
+            return 0;
+        } else {
+            printf("Incorrect response. Please try again: ");
+            fflush(stdout);
+        }
+    }
 }
 
 void send_command(int sock, const char *command) {
