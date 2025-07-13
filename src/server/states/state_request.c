@@ -116,7 +116,7 @@ unsigned request_read(struct selector_key *key) {
     freeaddrinfo(res);
     write_response(&connection->write_buffer, SUCCESS, atyp, host, port);
     selector_set_interest_key(key, OP_WRITE);
-    return STATE_REQUEST;
+    return request_write(key);
 }
 
 unsigned request_write(struct selector_key *key) {

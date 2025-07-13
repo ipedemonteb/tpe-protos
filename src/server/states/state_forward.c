@@ -38,7 +38,7 @@ unsigned forward_read(struct selector_key *key) {
     log(INFO, "Data received from %s, forwarding to %s", 
         from_client ? "client" : "origin", 
         from_client ? "origin" : "client");
-    return STATE_FORWARDING;
+    return forward_write(key);
 }
 
 unsigned forward_write(struct selector_key *key) {

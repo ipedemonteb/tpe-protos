@@ -50,11 +50,11 @@ unsigned auth_read(struct selector_key *key) {
     
     if (auth_status != 0x00) {
         log(INFO, "Invalid credentials for user: %s", username);
-        return STATE_AUTH_FAILED;
+        return auth_failed_write(key);
     }
 
     log(INFO, "Authentication successful for user: %s", username);
-    return STATE_AUTH;    
+    return auth_write(key);    
 }
 
 static unsigned auth_write_aux(struct selector_key *key, uint8_t auth_status, unsigned current_state) {

@@ -61,10 +61,11 @@ unsigned hello_read(struct selector_key *key) {
 
     if (chosen_method == AUTH_METHOD) {
         log(INFO, "Client supports authentication, switching to AUTH state");
-        return STATE_HELLO_TO_AUTH;
+        
+        return hello_to_auth_write(key);
     }
 
-    return STATE_HELLO;
+    return hello_write(key);
 }
 
 static unsigned hello_write_aux(struct selector_key *key, unsigned next_state, unsigned current_state) {
