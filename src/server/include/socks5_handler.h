@@ -22,18 +22,8 @@
 #include "../states/include/state_auth.h"
 #include "../states/include/state_request.h"
 #include "../states/include/state_forward.h"
+#include "../include/defines.h"
 
-#define BUFFER_SIZE 4096
-#define HOST_MAX_LEN 256
-#define PORT_MAX_LEN 6
-#define SOCKS5_VERSION 0x05
-#define AUTH_VERSION 0x01
-#define AUTH_METHOD 0x02
-#define NO_AUTH_METHOD 0x00
-#define IPV4_ATYP 0x01
-#define DOMAIN_NAME_ATYP 0x03
-#define IPV6_ATYP 0x04
-#define RSV 0x00
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
@@ -50,6 +40,7 @@ typedef enum {
 } socks5_state;
 
 typedef struct socks5_connection {
+    char username[MAX_USERNAME_LEN];
     int client_fd;
     int origin_fd;
     char origin_host[HOST_MAX_LEN];

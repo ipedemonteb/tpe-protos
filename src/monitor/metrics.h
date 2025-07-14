@@ -9,9 +9,7 @@
 #include <string.h>
 #include <time.h>
 #include "../utils/logger.h"
-
-#define MAX_USERNAME_LEN 64
-#define MAX_IP_LEN 46
+#include "../server/include/defines.h"
 #define MAX_HOSTNAME_LEN 256
 #define MAX_PORT_LEN 6
 #define MAX_METHOD_LEN 16

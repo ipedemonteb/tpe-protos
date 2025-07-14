@@ -14,21 +14,24 @@
 #include "include/server_utils.h"
 #include "include/selector.h"
 #include "include/socks5_handler.h"
+#include "include/args.h"
 
 #define INIT_ELEMENTS 1024
 #define DEFAULT_PORT "1080"
 
 static bool finished = false;
 
+static void sigterm_handler(const int signal) {
+    log(INFO, "Signal %d received, exiting", signal);
+    finished = true;
+}
+
 int init_server(char *socks_port, char *monitor_port);
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        log(FATAL, "Usage: %s <SOCKS5 Port> <Monitor port>", argv[0]);
-    }
+    struct socks5args args;
 
-    char * serv_port = argv[1];
-    char * monitor_port = argv[2];
+    parse_args(argc, argv, &args);
 
     // Nothing to read from stdin, omg free FD !
     close(STDIN_FILENO);
@@ -45,7 +48,7 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    return init_server(serv_port, monitor_port);
+    return init_server(args.socks_port, args.mng_port);
 }
 
 int init_server(char *serv_port, char *monitor_port) {
@@ -79,6 +82,8 @@ int init_server(char *serv_port, char *monitor_port) {
         goto finally;
     }
 
+    signal(SIGTERM, sigterm_handler);
+    signal(SIGINT, sigterm_handler);
 
     // Initialize the selector
     if (selector_init(&conf) != SELECTOR_SUCCESS) {
