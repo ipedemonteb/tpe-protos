@@ -47,11 +47,10 @@ version(void)
 {
     fprintf(stderr, "socks5v version 1.0\n"
         "ITBA Protocolos de Comunicación 2025/1 -- Grupo 3\n"
-        "   Licensed under the Apache License, Version 2.0\n"
-        "   You may not use this file except in compliance with the License.\n"
-        "   You may obtain a copy of the License at\n"
+        "Licensed under the Apache License, Version 2.0\n"
+        "You may obtain a copy of the License at\n"
         "\n"
-        "     http://www.apache.org/licenses/LICENSE-2.0\n"
+        "  http://www.apache.org/licenses/LICENSE-2.0\n"
         );
 }
 
