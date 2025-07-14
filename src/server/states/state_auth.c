@@ -53,6 +53,8 @@ unsigned auth_read(struct selector_key *key) {
         return auth_failed_write(key);
     }
 
+    strncpy(connection->username, username, MAX_USERNAME_LEN);
+
     log(INFO, "Authentication successful for user: %s", username);
     return auth_write(key);    
 }

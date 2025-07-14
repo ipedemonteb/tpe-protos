@@ -5,9 +5,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <sys/types.h>
-
-#define MAX_USERNAME_LEN 64
-#define MAX_IP_LEN 46
+#include "../server/include/defines.h"
 
 //@todo: ver si hace falta agregar más data
 typedef struct {

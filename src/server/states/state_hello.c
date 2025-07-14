@@ -65,6 +65,8 @@ unsigned hello_read(struct selector_key *key) {
         return hello_to_auth_write(key);
     }
 
+    strncpy(connection->username, "Anonymous", MAX_USERNAME_LEN);
+     
     return hello_write(key);
 }
 
