@@ -12,6 +12,8 @@
 #define DEFAULT_MONITOR_PORT "9090"
 #define DEFAULT_MONITOR_HOST "localhost"
 #define PROMPT "monitor>"
+#define OK_RESPONSE_PREFIX "OK"
+#define OK_RESPONSE_PREFIX_LEN 2
 #define QUIT_COMMAND "quit"
 #define INITIAL_MESSAGE "Type commands and press Enter. Type 'quit' to exit.\n\n"
 
@@ -31,18 +33,13 @@ int main(int argc, char *argv[]) {
         port = argv[2];
     }
     
-    printf("Connecting to monitor server at %s:%s\n", host, port);
-    
     int sock = connect_to_monitor(host, port);
     if (sock < 0) {
         perror("Failed to connect to monitor server\n");
         return 1;
     }
     
-    printf("Connected! Starting authentication...\n");
-    
     if (authenticate_user(sock) != 0) {
-        perror("Authentication failed\n");
         close(sock);
         return 1;
     }   
@@ -79,7 +76,7 @@ int connect_to_monitor(const char *host, const char *port) {
         }
         
         if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1) {
-            break; // Success
+            break;
         }
         
         close(sock);
@@ -123,13 +120,19 @@ int authenticate_user(int sock) {
         return -1;
     }
     
-    received = recv(sock, buffer, sizeof(buffer) - 1, 0);
+    received = recv(sock, buffer, BUFFER_SIZE - 1, 0);
     if (received <= 0) {
         perror("Failed to receive server response\n");
         return -1;
     }
     buffer[received] = '\0'; 
     printf("%s", buffer);
+    if (strncmp(buffer, OK_RESPONSE_PREFIX, OK_RESPONSE_PREFIX_LEN) != 0) {
+        if (recv(sock, buffer, BUFFER_SIZE - 1, 0) <= 0) {
+            printf("Server closed connection\n");
+        }
+        return -1;
+    }
     return 0;
 }
 

@@ -224,6 +224,8 @@ int handle_monitor_handshake_read(struct buffer *read_buff, int fd) {
                     log(ERROR, "monitor: failed to send error message: %s", strerror(errno));
                 }
                 log(ERROR, "monitor: invalid credentials from user '%s', closing connection", username);
+                //@todo: parece mejor estilo que parsear por ERR pero no se como incorporarlo
+                shutdown(fd, SHUT_RDWR);
                 close(fd);
                 return -1;
             }
