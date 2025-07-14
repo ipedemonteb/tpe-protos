@@ -19,8 +19,10 @@ unsigned forward_read(struct selector_key *key) {
 
     struct buffer *dst_buf = from_client ? &conn->origin_write_buffer : &conn->write_buffer;
     if (!buffer_can_write(dst_buf)) {
-        if (selector_set_interest_key(key, OP_NOOP) != SELECTOR_SUCCESS) {
-            log(ERROR, "Failed to set OP_NOOP");
+        int other_fd = from_client ? conn->origin_fd : conn->client_fd;
+        if (selector_set_interest_key(key, OP_NOOP) != SELECTOR_SUCCESS ||
+            selector_set_interest(key->s, other_fd, OP_WRITE) != SELECTOR_SUCCESS) {
+            log(ERROR, "Failed to set interests when buffer full");
             return STATE_ERROR;
         }
         return STATE_FORWARDING;
@@ -42,16 +44,29 @@ unsigned forward_read(struct selector_key *key) {
     metrics_bytes_transferred(read_bytes);
 
     int other_fd = from_client ? conn->origin_fd : conn->client_fd;
-    struct buffer *src_buf = dst_buf;
-    if (buffer_can_read(src_buf)) {
-        int sent = forward_send(other_fd, src_buf);
-        if ((sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) || buffer_can_read(src_buf)) {
-            selector_set_interest(key->s, other_fd, OP_WRITE);
-        } else {
-            selector_set_interest(key->s, other_fd, OP_READ);
+    
+    if (buffer_can_read(dst_buf)) {
+        int sent = forward_send(other_fd, dst_buf);
+        if (sent < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+            log(ERROR, "send() failed in forward_read: %s", strerror(errno));
+            return STATE_ERROR;
         }
-    } else {
-        selector_set_interest(key->s, other_fd, OP_READ);
+        
+        if (buffer_can_read(dst_buf)) {
+            if (selector_set_interest(key->s, other_fd, OP_WRITE) != SELECTOR_SUCCESS) {
+                return STATE_ERROR;
+            }
+        } else {
+            if (selector_set_interest(key->s, other_fd, OP_READ) != SELECTOR_SUCCESS) {
+                return STATE_ERROR;
+            }
+        }
+    }
+    
+    if (buffer_can_write(dst_buf)) {
+        if (selector_set_interest_key(key, OP_READ) != SELECTOR_SUCCESS) {
+            return STATE_ERROR;
+        }
     }
 
     return STATE_FORWARDING;
@@ -63,8 +78,10 @@ unsigned forward_write(struct selector_key *key) {
 
     struct buffer *src_buf = to_client ? &conn->write_buffer : &conn->origin_write_buffer;
     if (!buffer_can_read(src_buf)) {
-        if (selector_set_interest_key(key, OP_NOOP) != SELECTOR_SUCCESS) {
-            log(ERROR, "Failed to set OP_NOOP in forward_write");
+        int other_fd = to_client ? conn->origin_fd : conn->client_fd;
+        if (selector_set_interest_key(key, OP_READ) != SELECTOR_SUCCESS ||
+            selector_set_interest(key->s, other_fd, OP_READ) != SELECTOR_SUCCESS) {
+            log(ERROR, "Failed to set OP_READ in forward_write");
             return STATE_ERROR;
         }
         return STATE_FORWARDING;
@@ -77,12 +94,29 @@ unsigned forward_write(struct selector_key *key) {
         return STATE_ERROR;
     }
 
-    if(!buffer_can_read(src_buf)) {
-        if(selector_set_interest(key->s, key->fd, OP_READ) != SELECTOR_SUCCESS) {
-            log(ERROR, "Failed to set OP_READ in forward_write");
+    int other_fd = to_client ? conn->origin_fd : conn->client_fd;
+    struct buffer *other_buf = to_client ? &conn->origin_write_buffer : &conn->write_buffer;
+    
+    if (buffer_can_read(src_buf)) {
+        if (selector_set_interest_key(key, OP_WRITE) != SELECTOR_SUCCESS) {
+            return STATE_ERROR;
+        }
+    } else {
+        if (selector_set_interest_key(key, OP_READ) != SELECTOR_SUCCESS) {
             return STATE_ERROR;
         }
     }
+    
+    if (buffer_can_read(other_buf)) {
+        if (selector_set_interest(key->s, other_fd, OP_WRITE) != SELECTOR_SUCCESS) {
+            return STATE_ERROR;
+        }
+    } else {
+        if (selector_set_interest(key->s, other_fd, OP_READ) != SELECTOR_SUCCESS) {
+            return STATE_ERROR;
+        }
+    }
+
     log(INFO, "Data sent to %s", to_client ? "client" : "origin");
     return STATE_FORWARDING;
 }
