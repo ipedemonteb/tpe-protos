@@ -3,6 +3,14 @@
 
 #include <stdint.h>
 #include <sys/socket.h>
+#include <stddef.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include "metrics.h"
+#include "../utils/logger.h"
 #include "../server/include/selector.h"
 #include "../server/include/buffer.h"
 #include "../server/include/user_auth_utils.h"

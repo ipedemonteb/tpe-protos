@@ -1,19 +1,17 @@
-#include <stddef.h>
-#include <errno.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include "../utils/logger.h"
-#include "../server/include/buffer.h"
-#include "../server/include/selector.h"
-#include "../server/include/user_auth_utils.h"
 #include "monitor_handler.h"
-#include "metrics.h"
 
+//@todo: deberíamos tener un archivo de configuración para estos valores?
+#define USERNAME_MAX_LEN 32
+#define PASSWORD_MAX_LEN 32
+#define MAX_USERS 500
 #define MONITOR_BANNER "SOCKS-MONITOR"
 #define MONITOR_VERSION "1.0"
+#define INVALID_CREDENTIALS_MSG "ERR Invalid credentials\n"
+#define INVALID_CREDENTIALS_MSG_LEN 24
+#define INVALID_CREDENTAILS_FORMAT_MSG "ERR Invalid format. Use username:password\n"
+#define INVALID_CREDENTAILS_FORMAT_MSG_LEN 51
+#define MAX_CONFIG_PARAM_LEN 64
+#define INITIAL_USER_LIST_CAPACITY 1463
 
 static const struct fd_handler monitor_handler = {
     .handle_read = monitor_read,
@@ -203,7 +201,7 @@ int handle_monitor_handshake_read(struct buffer *read_buff, int fd) {
             break;
         }
 
-        char username[32], password[32];
+        char username[USERNAME_MAX_LEN], password[PASSWORD_MAX_LEN];
         if(parse_username_password(line, username, password)) {
             buffer_reset(read_buff);
             if (credentials_are_valid(username, password) == 0) {
@@ -218,21 +216,19 @@ int handle_monitor_handshake_read(struct buffer *read_buff, int fd) {
                 log(INFO, "monitor: successful authentication for user '%s'", username);
                 return 0;
             } else {
-                const char *error_msg = "ERR Invalid credentials\n";
-                ssize_t sent = send(fd, error_msg, strlen(error_msg), 0);
+                ssize_t sent = send(fd, INVALID_CREDENTIALS_MSG, INVALID_CREDENTIALS_MSG_LEN, 0);
                 if (sent < 0) {
                     log(ERROR, "monitor: failed to send error message: %s", strerror(errno));
                 }
                 log(ERROR, "monitor: invalid credentials from user '%s', closing connection", username);
-                //@todo: parece mejor estilo que parsear por ERR pero no se como incorporarlo
+                //@todo: parece mejor estilo que parsear por ERR pero no se bien como incorporarlo
                 shutdown(fd, SHUT_RDWR);
                 close(fd);
                 return -1;
             }
         } else {
             log(INFO, "monitor: invalid username:password format: '%s'", line);
-            const char *error_msg = "ERR Invalid format. Use username:password\n";
-            ssize_t sent = send(fd, error_msg, strlen(error_msg), 0);
+            ssize_t sent = send(fd, INVALID_CREDENTAILS_FORMAT_MSG, INVALID_CREDENTAILS_FORMAT_MSG_LEN, 0);
             if (sent < 0) {
                 log(ERROR, "monitor: failed to send error message: %s", strerror(errno));
             }
@@ -361,41 +357,70 @@ void handle_connections_command(monitor_connection *conn) {
              current_conn, max_conn);
 }
 
+static char *build_user_list_string(user_info *users, int count, monitor_connection *conn) {
+    int capacity = INITIAL_USER_LIST_CAPACITY;
+    char *user_list = malloc(capacity);
+    if (user_list == NULL) {
+        log(ERROR, "Failed to allocate memory for user list");
+        snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Memory allocation failed\n");
+        return NULL;
+    }
+
+    strcpy(user_list, "OK ");
+    int pos = 3;
+
+    for (int i = 0; i < count; i++) {
+        int written = snprintf(NULL, 0, "%s:%s ", users[i].username, users[i].ip_address);
+        if (pos + written >= capacity) {
+            capacity += INITIAL_USER_LIST_CAPACITY;
+            char *new_user_list = realloc(user_list, capacity);
+            if (new_user_list == NULL) {
+                log(ERROR, "Failed to reallocate memory for user list");
+                free(user_list);
+                snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Memory allocation failed\n");
+                return NULL;
+            }
+            user_list = new_user_list;
+        }
+
+        snprintf(user_list + pos, capacity - pos, "%s:%s ", users[i].username, users[i].ip_address);
+        log(INFO, "User %d: %s:%s", i, users[i].username, users[i].ip_address);
+        pos += written;
+    }
+
+    if (pos > 3) {
+        user_list[pos - 1] = '\n';
+        user_list[pos] = '\0';
+    }
+
+    return user_list;
+}
+
 void handle_users_command(monitor_connection *conn) {
-    user_info users[100];
+    user_info users[MAX_USERS];
     int count = metrics_get_user_count();
-    metrics_get_users(users, 100);
+    metrics_get_users(users, MAX_USERS);
     
     if (count == 0) {
         snprintf(conn->response, MAX_RESPONSE_SIZE, "OK No active users\n");
         return;
     }
     
-    char user_list[512] = "OK ";
-    int pos = 3;
-    
-    for (int i = 0; i < count && pos < 500; i++) {
-        int written = snprintf(user_list + pos, sizeof(user_list) - pos, "%s:%s ", users[i].username, users[i].ip_address);
-        if (written > 0) {
-            log(INFO, "User %d: %s:%s", i, users[i].username, users[i].ip_address);
-            pos += written;
-        }
-    }
+    char *user_list = build_user_list_string(users, count, conn);
+
+    strncpy(conn->response, user_list, MAX_RESPONSE_SIZE - 1);
+    conn->response[MAX_RESPONSE_SIZE - 1] = '\0';
 
     log(INFO, "Active users: %d", count);
     log(INFO, "User list: %s", user_list);
-    
-    if (pos > 4) {
-        user_list[pos-1] = '\n';
-        user_list[pos] = '\0';
-    }
-    
+
     strncpy(conn->response, user_list, MAX_RESPONSE_SIZE - 1);
     conn->response[MAX_RESPONSE_SIZE - 1] = '\0';
+    free(user_list);
 }
 
 void handle_config_command(monitor_connection *conn, const char *args) {
-    char param[64], value[64];
+    char param[MAX_CONFIG_PARAM_LEN], value[MAX_CONFIG_PARAM_LEN];
     if (sscanf(args, "%63s %63s", param, value) == 2) {
         if (strcmp(param, "timeout") == 0) {
             int timeout = atoi(value);
