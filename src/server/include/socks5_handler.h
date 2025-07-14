@@ -23,7 +23,7 @@
 #include "../states/include/state_request.h"
 #include "../states/include/state_forward.h"
 
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 16384
 #define HOST_MAX_LEN 256
 #define PORT_MAX_LEN 6
 #define SOCKS5_VERSION 0x05
