@@ -25,13 +25,6 @@ static void add_user_site(user_info *user_info, int * site_count, bool success, 
     if (site == NULL || user_info == NULL) {
         return;
     }
-    if (user_info->sites_visited == NULL) {
-        user_info->sites_visited = malloc(sizeof(site_visit) * INITIAL_SITES_VECTOR_CAPACITY);
-        if (user_info->sites_visited == NULL) {
-            log(ERROR, "Failed to allocate memory for user sites visited");
-            return;
-        }
-    }
     if (*site_count % INITIAL_SITES_VECTOR_CAPACITY == 0) {
         site_visit *new_sites = realloc(user_info->sites_visited, sizeof(site_visit) * (*site_count + INITIAL_SITES_VECTOR_CAPACITY));
         if (new_sites == NULL) {
@@ -53,6 +46,7 @@ void metrics_init(struct selector_init *conf) {
     config = conf;
     server_start_time = time(NULL);
     memset(active_users, 0, sizeof(active_users));
+    memset(all_time_users, 0, sizeof(all_time_users));
     user_count = 0;
 }
 
@@ -84,38 +78,29 @@ void metrics_bytes_transferred(ssize_t bytes) {
     pthread_mutex_unlock(&metrics_mutex);
 }
 
+static void find_and_update_users(user_info * users, int *current_count, char * username, char * ip_address) {
+    for (int i = 0; i < *current_count; i++) {
+        if (strcmp(users[i].username, username) == 0) {
+            strncpy(users[i].ip_address, ip_address, sizeof(users[i].ip_address) - 1);
+            users[i].last_seen = time(NULL);
+            return;
+        }
+    }
+    if (*current_count < MAX_USERS) {
+        strncpy(users[*current_count].username, username, sizeof(users[*current_count].username) - 1);
+        strncpy(users[*current_count].ip_address, ip_address, sizeof(users[*current_count].ip_address) - 1);
+        users[*current_count].last_seen = time(NULL);
+        (*current_count)++;
+    }
+}
+
 void metrics_add_user(const char *username, const char *ip_address) {
+    int foundUser = 0;
     pthread_mutex_lock(&metrics_mutex);
     
     if (user_count < MAX_USERS) {
-        for (int i = 0; i < user_count; i++) {
-            if (strcmp(active_users[i].username, username) == 0) {
-                strncpy(active_users[i].ip_address, ip_address, sizeof(active_users[i].ip_address) - 1);
-                active_users[i].last_seen = time(NULL);
-                pthread_mutex_unlock(&metrics_mutex);
-                goto add_all_time;
-            }
-        }
-    
-        strncpy(active_users[user_count].username, username, sizeof(active_users[user_count].username) - 1);
-        strncpy(active_users[user_count].ip_address, ip_address, sizeof(active_users[user_count].ip_address) - 1);
-        active_users[user_count].last_seen = time(NULL);
-        user_count++;
-    }
-add_all_time:
-    // Agregar a all_time_users si no existe
-    int exists = 0;
-    for (int i = 0; i < all_time_user_count; i++) {
-        if (strcmp(all_time_users[i].username, username) == 0) {
-            exists = 1;
-            break;
-        }
-    }
-    if (!exists && all_time_user_count < MAX_ALL_TIME_USERS) {
-        strncpy(all_time_users[all_time_user_count].username, username, sizeof(all_time_users[all_time_user_count].username) - 1);
-        strncpy(all_time_users[all_time_user_count].ip_address, ip_address, sizeof(all_time_users[all_time_user_count].ip_address) - 1);
-        all_time_users[all_time_user_count].last_seen = time(NULL);
-        all_time_user_count++;
+        find_and_update_users(all_time_users, &all_time_user_count, (char *)username, (char *)ip_address);
+        find_and_update_users(active_users, &user_count, (char *)username, (char *)ip_address);
     }
     pthread_mutex_unlock(&metrics_mutex);
 }
@@ -240,7 +225,6 @@ static void free_site_visit(site_visit *site) {
     if (site != NULL) {
         free(site->destination_host);
         free(site->destination_port);
-        free(site->method);
         free(site);
     }
 }

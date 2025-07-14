@@ -9,28 +9,29 @@ int open_socket(const char *host, const char *port, struct addrinfo **res);
 
 static void add_user_site(const char * user, const char * port, const char *site, int success) {
     char * destination_host = malloc(HOST_MAX_LEN);
-        if (destination_host == NULL) {
-            log(ERROR, "Failed to allocate memory for destination host");
-            return STATE_ERROR;
-        }
-        strncpy(destination_host, site, HOST_MAX_LEN - 1);
-        destination_host[HOST_MAX_LEN - 1] = '\0';
-        char * destination_port = malloc(PORT_MAX_LEN);
-        if (destination_port == NULL) {
-            log(ERROR, "Failed to allocate memory for destination port");
-            free(destination_host);
-            return STATE_ERROR;
-        }
-        strncpy(destination_port, port, PORT_MAX_LEN - 1);
-        destination_port[PORT_MAX_LEN - 1] = '\0';
-        metrics_add_user_site(user, destination_host, success, destination_port);
+    if (destination_host == NULL) {
+        log(ERROR, "Failed to allocate memory for destination host");
+        return;
+    }
+    strncpy(destination_host, site, HOST_MAX_LEN - 1);
+    destination_host[HOST_MAX_LEN - 1] = '\0';
+    char * destination_port = malloc(PORT_MAX_LEN);
+    if (destination_port == NULL) {
+        log(ERROR, "Failed to allocate memory for destination port");
+        free(destination_host);
+        return;
+    }
+    strncpy(destination_port, port, PORT_MAX_LEN - 1);
+    destination_port[PORT_MAX_LEN - 1] = '\0';
+    metrics_add_user_site(user, destination_host, success, destination_port);
 }
 
 unsigned request_read(struct selector_key *key) {
     socks5_connection *connection = key->data;
+    metrics_add_user(connection->username, connection->origin_host);
     size_t n;
     uint8_t *ptr = buffer_write_ptr(&connection->read_buffer, &n);
-
+    
     // @TODO: VER EL TEMA DE CONSUMIR DESTRUCTIVAMENTE
     ssize_t read = recv(connection->client_fd, ptr, n, 0);
     if (read < 0) {
@@ -41,16 +42,16 @@ unsigned request_read(struct selector_key *key) {
         return STATE_DONE;
     }
     buffer_write_adv(&connection->read_buffer, read);
-
+    
     if (buffer_readable_bytes(&connection->read_buffer) < 4) {
         return STATE_REQUEST;
     }
-
+    
     if(buffer_read(&connection->read_buffer) != SOCKS5_VERSION) {
         log(ERROR, "Unsupported SOCKS version in request");
         return STATE_ERROR;
     }
-
+    
     // Only support CONNECT command for now
     uint8_t cmd = buffer_read(&connection->read_buffer);
     // Reserved
@@ -61,6 +62,7 @@ unsigned request_read(struct selector_key *key) {
     char host[HOST_MAX_LEN] = {0};
     char port[PORT_MAX_LEN] = {0};
     int result = -1;
+    
     switch (atyp) {
         case IPV4_ATYP: {
             result = get_ipv4_address(&connection->read_buffer, host, port);
@@ -71,32 +73,32 @@ unsigned request_read(struct selector_key *key) {
             break;
         }
         case IPV6_ATYP:
-            result = get_ipv6_address(&connection->read_buffer, host, port);
-            break;
+        result = get_ipv6_address(&connection->read_buffer, host, port);
+        break;
         default:
-            log(ERROR, "Unsupported address type: %d", atyp);
-            write_response(&connection->write_buffer, UNSUPPORTED_ATYP, atyp, host, port);
-            selector_set_interest_key(key, OP_WRITE);
-            return STATE_REQUEST;
+        log(ERROR, "Unsupported address type: %d", atyp);
+        write_response(&connection->write_buffer, UNSUPPORTED_ATYP, atyp, host, port);
+        selector_set_interest_key(key, OP_WRITE);
+        return STATE_REQUEST;
     }
     if (result < 0) {
         log(INFO, "Request message incomplete, waiting for more bytes");
         return STATE_REQUEST;
     }
-
+    
     connection->origin_atyp = atyp;
     strncpy(connection->origin_host, host, HOST_MAX_LEN - 1);
     strncpy(connection->origin_port, port, PORT_MAX_LEN - 1);
-
+    
     if(cmd != CONNECT_CMD) {
         log(ERROR, "Unsupported command: %d", cmd);
         write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
         selector_set_interest_key(key, OP_WRITE);
         return STATE_REQUEST;
     }
-
+    
     log(INFO, "Connecting to %s:%s", host, port);
-
+    
     // Open connection to the origin server
     struct addrinfo *res;
     connection->origin_fd = open_socket(host, port, &res);
@@ -104,7 +106,7 @@ unsigned request_read(struct selector_key *key) {
         write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
         selector_set_interest_key(key, OP_WRITE);
         //@todo: agregar el usuario
-        add_user_site("anonymous", port, host, false);
+        add_user_site(connection->username, port, host, false);
         return STATE_REQUEST;
     }
     if (connection->origin_fd == -2) {
@@ -113,38 +115,41 @@ unsigned request_read(struct selector_key *key) {
         return STATE_REQUEST;
     }
     connection->origin_res = res;
-
+    
     if (selector_fd_set_nio(connection->origin_fd) == -1) {
         close(connection->origin_fd);
         freeaddrinfo(res);
         return STATE_ERROR;
     }
-
+    
     if (connect(connection->origin_fd, res->ai_addr, res->ai_addrlen) == -1) {
+        
         if (errno != EINPROGRESS) {
             log(ERROR, "connect() failed: %s", strerror(errno));
             write_response(&connection->write_buffer, CONNECTION_REFUSED, atyp, host, port);
-            //@todo: agregar el usuario
-            add_user_site("anonymus", port, host, false);
+            log(INFO, "Connection to %s:%s failed: %s", host, port, strerror(errno));
+            add_user_site(connection->username, port, host, false);
             close(connection->origin_fd);
             freeaddrinfo(res);
             return STATE_REQUEST;
         }
-
+        
         connection->references++;
         if (selector_register(key->s, connection->origin_fd, &socks5_stm_handler, OP_WRITE, connection) != SELECTOR_SUCCESS) {
+            add_user_site(connection->username, port, host, false);
             close(connection->origin_fd);
             freeaddrinfo(res);
             return STATE_ERROR;
         }
-
         selector_set_interest_key(key, OP_NOOP);
+        log(INFO, "Connection to %s:%s is in progress", host, port);
+        add_user_site(connection->username, port, host, true);
         return STATE_CONNECT;
     }
 
     freeaddrinfo(res);
     write_response(&connection->write_buffer, SUCCESS, atyp, host, port);
-    add_user_site("anonymus", port, host, true);
+    add_user_site(connection->username, port, host, true);
     selector_set_interest_key(key, OP_WRITE);
     return request_write(key);
 }

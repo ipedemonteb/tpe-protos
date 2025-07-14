@@ -451,33 +451,36 @@ void handle_access_log_command(monitor_connection *conn) {
     user_info users[MAX_USERS];
     int count = metrics_get_all_time_user_count();
     metrics_get_all_time_users(users, MAX_USERS);
+    log(INFO, "Amount of all time users: %d", count);
     for (int  i=0; i<count; i++) {
-        log(INFO, "User %d: %s, IP: %s, Last seen: %ld, Sites visited: %d",
-            i, users[i].username, users[i].ip_address, users[i].last_seen, users[i].site_count);
+        log(INFO, "User %d: %s", i, users[i].username);
+        log(INFO, "IP: %s", users[i].ip_address);
+        log(INFO, "Last seen: %ld", users[i].last_seen);
+        log(INFO, "Sites visited: %d", users[i].site_count);
     }
     buffer_reset(&conn->write_buffer);
     int written = snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Access log for all users:\n");
     for (int i = 0; i < count; i++) {
         for (int j = 0; j < users[i].site_count; j++) {
+            log(INFO, "SALI");
             site_visit *sv = &users[i].sites_visited[j];
             char timebuf[32];
             struct tm *tm_info = localtime(&sv->timestamp);
             strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tm_info);
             written += snprintf(conn->response + written, MAX_RESPONSE_SIZE - written,
-                "%s: %s:%s [%s] %s %s\n",
+                "%s: %s:%s [%s] %s\n",
                 users[i].username,
                 sv->destination_host,
                 sv->destination_port,
                 timebuf,
-                sv->success ? "SUCCESS" : "FAIL",
-                sv->method);
+                sv->success ? "SUCCESS" : "FAIL");
+                if (written >= MAX_RESPONSE_SIZE - 128) break;
+            }
             if (written >= MAX_RESPONSE_SIZE - 128) break;
         }
-        if (written >= MAX_RESPONSE_SIZE - 128) break;
-    }
-    if (written == 0) {
-        snprintf(conn->response, MAX_RESPONSE_SIZE, "OK No access log entries\n");
-    }
+        if (written == 0) {
+            snprintf(conn->response, MAX_RESPONSE_SIZE, "OK No access log entries\n");
+        }
 }
 
 void handle_access_log_user_command(monitor_connection *conn, const char *username) {

@@ -92,8 +92,7 @@ void socks5_stm_close(struct selector_key *key) {
     }
 }
 
-void accept_connection(struct selector_key *key) {
-    int server_fd = key->fd;
+void accept_connection(struct selector_key *key) {    int server_fd = key->fd;
     fd_selector selector = key->data;
     struct sockaddr_storage client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
@@ -157,9 +156,6 @@ void accept_connection(struct selector_key *key) {
         struct sockaddr_in6 *s = (struct sockaddr_in6 *)&client_addr;
         inet_ntop(AF_INET6, &s->sin6_addr, client_ip, sizeof(client_ip));
     }
-    
-    // @todo: añadir al usuario real cuando sea implementado
-    metrics_add_user("anonymous", client_ip);
 
     log(INFO, "New SOCKS client connected: fd=%d, ip=%s", client_fd, client_ip);
 }
