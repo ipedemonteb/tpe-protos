@@ -1,8 +1,4 @@
-#include <pthread.h>
-#include <string.h>
-#include <time.h>
 #include "metrics.h"
-#include "../utils/logger.h"
 
 #define MAX_USERS 100
 #define MAX_CONNECTIONS 100
@@ -132,6 +128,7 @@ int metrics_get_user_count() {
     return result;
 }
 
+//@todo: ver si es necesaria
 void metrics_get_users(user_info *users, int max_users) {
     pthread_mutex_lock(&metrics_mutex);
     int count = (user_count < max_users) ? user_count : max_users;
@@ -159,4 +156,18 @@ int metrics_get_max_connections() {
     int current_MAX_CONNECTIONS = MAX_CONNECTIONS;
     pthread_mutex_unlock(&metrics_mutex);
     return current_MAX_CONNECTIONS;
+}
+
+//@todo: ver si cambiar metodo de guardar usuarios activos por el hashmap
+void metrics_add_user_site(const char *username, const char *site) {
+    pthread_mutex_lock(&metrics_mutex);
+    //@todo: cambiar por variable de cantidad total de usuarios registrados
+    for (int i = 0; i < current_connections; i++) {
+        if (strcmp(active_users[i].username, username) == 0) {
+            strncpy(active_users[i].user_sites[active_users[i].site_count], site, sizeof(active_users[i].user_sites[active_users[i].site_count]) - 1);
+            active_users[i].site_count++;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&metrics_mutex);
 }

@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include <time.h>
 #include <sys/types.h>
+#include <pthread.h>
+#include <string.h>
+#include <time.h>
+#include "../utils/logger.h"
 
 #define MAX_USERNAME_LEN 64
 #define MAX_IP_LEN 46
@@ -14,6 +18,8 @@ typedef struct {
     char username[MAX_USERNAME_LEN];
     char ip_address[MAX_IP_LEN];
     time_t last_seen;
+    char user_sites[100][100];
+    int site_count;
 } user_info;
 
 void metrics_init(struct selector_init *conf);
@@ -21,6 +27,7 @@ void metrics_init(struct selector_init *conf);
 int metrics_connection_start();
 void metrics_connection_end();
 void metrics_bytes_transferred(ssize_t bytes);
+void metrics_add_user_site(const char *username, const char *site);
 
 void metrics_add_user(const char *username, const char *ip_address);
 void metrics_remove_user(const char *username);
