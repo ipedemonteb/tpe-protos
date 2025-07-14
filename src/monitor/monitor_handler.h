@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 #include "../server/include/selector.h"
 #include "../server/include/buffer.h"
+#include "../server/include/user_auth_utils.h"
 
 #define MONITOR_BUFFER_SIZE 1024
 #define MAX_COMMAND_SIZE 256
@@ -30,6 +31,8 @@ typedef struct monitor_connection {
     char response[MAX_RESPONSE_SIZE];
     int handshake_done;
 } monitor_connection;
+
+int parse_username_password(const char *input, char *username, char *password);
 
 void monitor_accept_connection(struct selector_key *key);
 void monitor_read(struct selector_key *key);

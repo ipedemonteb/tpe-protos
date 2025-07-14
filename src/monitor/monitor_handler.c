@@ -8,6 +8,7 @@
 #include "../utils/logger.h"
 #include "../server/include/buffer.h"
 #include "../server/include/selector.h"
+#include "../server/include/user_auth_utils.h"
 #include "monitor_handler.h"
 #include "metrics.h"
 
@@ -19,6 +20,28 @@ static const struct fd_handler monitor_handler = {
     .handle_write = monitor_write,
     .handle_close = monitor_close,
 };
+
+int parse_username_password(const char *input, char *username, char *password) {
+    const char *delimiter = strchr(input, ':');
+    if (delimiter == NULL) {
+        return 0;
+    }
+
+    size_t username_len = delimiter - input;
+    size_t password_len = strlen(delimiter + 1);
+
+    if (username_len == 0 || password_len == 0) {
+        return 0;
+    }
+
+    strncpy(username, input, username_len);
+    username[username_len] = '\0';
+
+    strncpy(password, delimiter + 1, password_len);
+    password[password_len] = '\0';
+
+    return 1;
+}
 
 void monitor_accept_connection(struct selector_key *key) {
     int server_fd = key->fd;
@@ -56,7 +79,7 @@ void monitor_accept_connection(struct selector_key *key) {
     new_connection->handshake_done = 0;
     new_connection->state = MONITOR_HANDSHAKE_WRITE;
 
-    const char *banner = "SOCKS-MONITOR 1.0\n";
+    const char *banner = "Please enter Username:password (in that format)\n";
     size_t banner_len = strlen(banner);
     for(size_t i = 0; i < banner_len; i++) {
         buffer_write(&new_connection->write_buffer, banner[i]);
@@ -179,11 +202,40 @@ int handle_monitor_handshake_read(struct buffer *read_buff, int fd) {
         if(!found_newline) {
             break;
         }
-        if(strcmp(line, "MONITOR-CLIENT 1.0") == 0) {
+
+        char username[32], password[32];
+        if(parse_username_password(line, username, password)) {
             buffer_reset(read_buff);
-            return 0;
+            if (credentials_are_valid(username, password) == 0) {
+                snprintf(read_buff->data, read_buff->limit - read_buff->data, "OK Welcome %s\n", username);
+                buffer_write_adv(read_buff, strlen(read_buff->data));
+                ssize_t sent = send(fd, read_buff->data, strlen(read_buff->data), 0);
+                buffer_reset(read_buff);
+                if (sent < 0) {
+                    log(ERROR, "monitor send() failed: %s", strerror(errno));
+                    return -1;
+                }
+                log(INFO, "monitor: successful authentication for user '%s'", username);
+                return 0;
+            } else {
+                const char *error_msg = "ERR Invalid credentials\n";
+                ssize_t sent = send(fd, error_msg, strlen(error_msg), 0);
+                if (sent < 0) {
+                    log(ERROR, "monitor: failed to send error message: %s", strerror(errno));
+                }
+                log(ERROR, "monitor: invalid credentials from user '%s', closing connection", username);
+                close(fd);
+                return -1;
+            }
         } else {
-            log(INFO, "monitor: handshake inválido: '%s' (esperando línea válida)", line);
+            log(INFO, "monitor: invalid username:password format: '%s'", line);
+            const char *error_msg = "ERR Invalid format. Use username:password\n";
+            ssize_t sent = send(fd, error_msg, strlen(error_msg), 0);
+            if (sent < 0) {
+                log(ERROR, "monitor: failed to send error message: %s", strerror(errno));
+            }
+            close(fd);
+            return -1;
         }
     }
     return 1;
@@ -230,7 +282,6 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
             strncpy(conn->command, line, MAX_COMMAND_SIZE - 1);
             conn->command[MAX_COMMAND_SIZE - 1] = '\0';
             
-            // Process command
             char *space = strchr(conn->command, ' ');
             if(space != NULL) {
                 *space = '\0';
@@ -261,7 +312,6 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                 }
             }
             
-            // Prepare response
             //@todo: chequear
             buffer_reset(write_buff);
             size_t response_len = strlen(conn->response);
