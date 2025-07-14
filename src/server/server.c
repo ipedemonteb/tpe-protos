@@ -21,6 +21,11 @@
 
 static bool finished = false;
 
+static void sigterm_handler(const int signal) {
+    log(INFO, "Signal %d received, exiting", signal);
+    finished = true;
+}
+
 int init_server(char *socks_port, char *monitor_port);
 
 int main(int argc, char *argv[]) {
@@ -77,6 +82,8 @@ int init_server(char *serv_port, char *monitor_port) {
         goto finally;
     }
 
+    signal(SIGTERM, sigterm_handler);
+    signal(SIGINT, sigterm_handler);
 
     // Initialize the selector
     if (selector_init(&conf) != SELECTOR_SUCCESS) {
