@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <time.h>
 #include "metrics.h"
 #include "../utils/logger.h"
 #include "../server/include/selector.h"
@@ -17,7 +18,7 @@
 
 #define MONITOR_BUFFER_SIZE 1024
 #define MAX_COMMAND_SIZE 256
-#define MAX_RESPONSE_SIZE 1024
+#define MAX_RESPONSE_SIZE 3000
 
 typedef enum {
     MONITOR_HANDSHAKE_READ,
@@ -57,5 +58,7 @@ void handle_connections_command(monitor_connection *conn);
 void handle_users_command(monitor_connection *conn);
 void handle_config_command(monitor_connection *conn, const char *args);
 void handle_timeout_command(monitor_connection *conn);
+void handle_access_log_command(monitor_connection *conn);
+void handle_access_log_user_command(monitor_connection *conn, const char *username);
 
 #endif 

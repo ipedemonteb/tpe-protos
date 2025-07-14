@@ -144,6 +144,7 @@ finally:
     if (monitor_sock >= 0) {
         close(monitor_sock);
     }
+    metrics_free();
     selector_close();
     return ret;
 }

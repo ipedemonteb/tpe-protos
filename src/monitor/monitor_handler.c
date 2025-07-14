@@ -295,6 +295,8 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                     handle_config_command(conn, args);
                 } else if(strcmp(conn->command, "TIMEOUT") == 0) {
                     handle_timeout_command(conn);
+                } else if(strcmp(conn->command, "ACCESS_LOG") == 0) {
+                    handle_access_log_user_command(conn, args);
                 } else {
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Unknown command: %s\n", conn->command);
                 }
@@ -305,6 +307,8 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                     handle_connections_command(conn);
                 } else if(strcmp(conn->command, "USERS") == 0) {
                     handle_users_command(conn);
+                } else if(strcmp(conn->command, "ACCESS_LOG") == 0) {
+                    handle_access_log_command(conn);
                 } else {
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Unknown command: %s\n", conn->command);
                 }
@@ -441,4 +445,69 @@ void handle_config_command(monitor_connection *conn, const char *args) {
 void handle_timeout_command(monitor_connection *conn) {
     int current_timeout = metrics_get_timeout();
     snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Current timeout: %d seconds\n", current_timeout);
+} 
+
+void handle_access_log_command(monitor_connection *conn) {
+    user_info users[MAX_USERS];
+    int count = metrics_get_all_time_user_count();
+    metrics_get_all_time_users(users, MAX_USERS);
+    for (int  i=0; i<count; i++) {
+        log(INFO, "User %d: %s, IP: %s, Last seen: %ld, Sites visited: %d",
+            i, users[i].username, users[i].ip_address, users[i].last_seen, users[i].site_count);
+    }
+    buffer_reset(&conn->write_buffer);
+    int written = snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Access log for all users:\n");
+    for (int i = 0; i < count; i++) {
+        for (int j = 0; j < users[i].site_count; j++) {
+            site_visit *sv = &users[i].sites_visited[j];
+            char timebuf[32];
+            struct tm *tm_info = localtime(&sv->timestamp);
+            strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tm_info);
+            written += snprintf(conn->response + written, MAX_RESPONSE_SIZE - written,
+                "%s: %s:%s [%s] %s %s\n",
+                users[i].username,
+                sv->destination_host,
+                sv->destination_port,
+                timebuf,
+                sv->success ? "SUCCESS" : "FAIL",
+                sv->method);
+            if (written >= MAX_RESPONSE_SIZE - 128) break;
+        }
+        if (written >= MAX_RESPONSE_SIZE - 128) break;
+    }
+    if (written == 0) {
+        snprintf(conn->response, MAX_RESPONSE_SIZE, "OK No access log entries\n");
+    }
+}
+
+void handle_access_log_user_command(monitor_connection *conn, const char *username) {
+    user_info users[MAX_USERS];
+    int count = metrics_get_all_time_user_count();
+    metrics_get_all_time_users(users, MAX_USERS);
+    int found = 0;
+    buffer_reset(&conn->write_buffer);
+    int written = snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Access log for user %s:\n", username);
+    for (int i = 0; i < count; i++) {
+        if (strcmp(users[i].username, username) == 0) {
+            found = 1;
+            for (int j = 0; j < users[i].site_count; j++) {
+                site_visit *sv = &users[i].sites_visited[j];
+                char timebuf[32];
+                struct tm *tm_info = localtime(&sv->timestamp);
+                strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tm_info);
+                written += snprintf(conn->response + written, MAX_RESPONSE_SIZE - written,
+                    "%s:%s [%s] %s %s\n",
+                    sv->destination_host,
+                    sv->destination_port,
+                    timebuf,
+                    sv->success ? "SUCCESS" : "FAIL",
+                    sv->method);
+                if (written >= MAX_RESPONSE_SIZE - 128) break;
+            }
+            break;
+        }
+    }
+    if (!found) {
+        snprintf(conn->response, MAX_RESPONSE_SIZE, "OK No access log entries for user %s\n", username);
+    }
 } 

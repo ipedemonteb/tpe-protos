@@ -1,10 +1,30 @@
 #include "../include/socks5_handler.h"
 #include "include/state_utils.h"
+#include "../../monitor/metrics.h"
 
 int get_ipv4_address(struct buffer *buff, char *host, char *port);
 int get_domain_name(char *host, char *port, struct buffer *buff);
 int get_ipv6_address(struct buffer *buff, char *host, char *port) ;
 int open_socket(const char *host, const char *port, struct addrinfo **res);
+
+static void add_user_site(const char * user, const char * port, const char *site, int success) {
+    char * destination_host = malloc(HOST_MAX_LEN);
+        if (destination_host == NULL) {
+            log(ERROR, "Failed to allocate memory for destination host");
+            return STATE_ERROR;
+        }
+        strncpy(destination_host, site, HOST_MAX_LEN - 1);
+        destination_host[HOST_MAX_LEN - 1] = '\0';
+        char * destination_port = malloc(PORT_MAX_LEN);
+        if (destination_port == NULL) {
+            log(ERROR, "Failed to allocate memory for destination port");
+            free(destination_host);
+            return STATE_ERROR;
+        }
+        strncpy(destination_port, port, PORT_MAX_LEN - 1);
+        destination_port[PORT_MAX_LEN - 1] = '\0';
+        metrics_add_user_site(user, destination_host, success, destination_port);
+}
 
 unsigned request_read(struct selector_key *key) {
     socks5_connection *connection = key->data;
@@ -83,6 +103,8 @@ unsigned request_read(struct selector_key *key) {
     if (connection->origin_fd == -1) {
         write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
         selector_set_interest_key(key, OP_WRITE);
+        //@todo: agregar el usuario
+        add_user_site("anonymous", port, host, false);
         return STATE_REQUEST;
     }
     connection->origin_res = res;
@@ -97,6 +119,8 @@ unsigned request_read(struct selector_key *key) {
         if (errno != EINPROGRESS) {
             log(ERROR, "connect() failed: %s", strerror(errno));
             write_response(&connection->write_buffer, CONNECTION_REFUSED, atyp, host, port);
+            //@todo: agregar el usuario
+            add_user_site("anonymus", port, host, false);
             close(connection->origin_fd);
             freeaddrinfo(res);
             return STATE_REQUEST;
@@ -115,6 +139,7 @@ unsigned request_read(struct selector_key *key) {
 
     freeaddrinfo(res);
     write_response(&connection->write_buffer, SUCCESS, atyp, host, port);
+    add_user_site("anonymus", port, host, true);
     selector_set_interest_key(key, OP_WRITE);
     return STATE_REQUEST;
 }

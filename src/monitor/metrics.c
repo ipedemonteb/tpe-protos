@@ -1,7 +1,9 @@
 #include "metrics.h"
 
-#define MAX_USERS 100
-#define MAX_CONNECTIONS 100
+#define MAX_USERS 500
+#define MAX_CONNECTIONS 500
+#define INITIAL_SITES_VECTOR_CAPACITY 10
+#define MAX_ALL_TIME_USERS 1000
 
 static pthread_mutex_t metrics_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -15,6 +17,37 @@ static struct selector_init *config;
 static user_info active_users[MAX_USERS];
 static int user_count = 0;
 
+static user_info all_time_users[MAX_ALL_TIME_USERS];
+static int all_time_user_count = 0;
+
+
+static void add_user_site(user_info *user_info, int * site_count, bool success, char * destination_port, char *site) {
+    if (site == NULL || user_info == NULL) {
+        return;
+    }
+    if (user_info->sites_visited == NULL) {
+        user_info->sites_visited = malloc(sizeof(site_visit) * INITIAL_SITES_VECTOR_CAPACITY);
+        if (user_info->sites_visited == NULL) {
+            log(ERROR, "Failed to allocate memory for user sites visited");
+            return;
+        }
+    }
+    if (*site_count % INITIAL_SITES_VECTOR_CAPACITY == 0) {
+        site_visit *new_sites = realloc(user_info->sites_visited, sizeof(site_visit) * (*site_count + INITIAL_SITES_VECTOR_CAPACITY));
+        if (new_sites == NULL) {
+            log(ERROR, "Failed to reallocate memory for user sites visited");
+            free(user_info->sites_visited);
+            return;
+        }
+        user_info->sites_visited = new_sites;
+    }
+    user_info->sites_visited[*site_count].destination_host = site;
+    user_info->sites_visited[*site_count].destination_port = destination_port;
+    user_info->sites_visited[*site_count].timestamp = time(NULL);
+    user_info->sites_visited[*site_count].success = success;
+    (*site_count)++;
+    return;
+}
 
 void metrics_init(struct selector_init *conf) {
     config = conf;
@@ -60,7 +93,7 @@ void metrics_add_user(const char *username, const char *ip_address) {
                 strncpy(active_users[i].ip_address, ip_address, sizeof(active_users[i].ip_address) - 1);
                 active_users[i].last_seen = time(NULL);
                 pthread_mutex_unlock(&metrics_mutex);
-                return;
+                goto add_all_time;
             }
         }
     
@@ -69,7 +102,21 @@ void metrics_add_user(const char *username, const char *ip_address) {
         active_users[user_count].last_seen = time(NULL);
         user_count++;
     }
-    
+add_all_time:
+    // Agregar a all_time_users si no existe
+    int exists = 0;
+    for (int i = 0; i < all_time_user_count; i++) {
+        if (strcmp(all_time_users[i].username, username) == 0) {
+            exists = 1;
+            break;
+        }
+    }
+    if (!exists && all_time_user_count < MAX_ALL_TIME_USERS) {
+        strncpy(all_time_users[all_time_user_count].username, username, sizeof(all_time_users[all_time_user_count].username) - 1);
+        strncpy(all_time_users[all_time_user_count].ip_address, ip_address, sizeof(all_time_users[all_time_user_count].ip_address) - 1);
+        all_time_users[all_time_user_count].last_seen = time(NULL);
+        all_time_user_count++;
+    }
     pthread_mutex_unlock(&metrics_mutex);
 }
 
@@ -128,7 +175,6 @@ int metrics_get_user_count() {
     return result;
 }
 
-//@todo: ver si es necesaria
 void metrics_get_users(user_info *users, int max_users) {
     pthread_mutex_lock(&metrics_mutex);
     int count = (user_count < max_users) ? user_count : max_users;
@@ -159,15 +205,54 @@ int metrics_get_max_connections() {
 }
 
 //@todo: ver si cambiar metodo de guardar usuarios activos por el hashmap
-void metrics_add_user_site(const char *username, const char *site) {
+void metrics_add_user_site(const char *username, char *site, int success, char* destination_port) {
     pthread_mutex_lock(&metrics_mutex);
-    //@todo: cambiar por variable de cantidad total de usuarios registrados
-    for (int i = 0; i < current_connections; i++) {
+    for (int i = 0; i < user_count; i++) {
         if (strcmp(active_users[i].username, username) == 0) {
-            strncpy(active_users[i].user_sites[active_users[i].site_count], site, sizeof(active_users[i].user_sites[active_users[i].site_count]) - 1);
-            active_users[i].site_count++;
+            add_user_site(&active_users[i], &active_users[i].site_count, success, destination_port, site);
+            break;
+        }
+    }
+    for (int i = 0; i < all_time_user_count; i++) {
+        if (strcmp(all_time_users[i].username, username) == 0) {
+            add_user_site(&all_time_users[i], &all_time_users[i].site_count, success, destination_port, site);
             break;
         }
     }
     pthread_mutex_unlock(&metrics_mutex);
 }
+
+int metrics_get_all_time_user_count() {
+    pthread_mutex_lock(&metrics_mutex);
+    int result = all_time_user_count;
+    pthread_mutex_unlock(&metrics_mutex);
+    return result;
+}
+
+void metrics_get_all_time_users(user_info *users, int max_users) {
+    pthread_mutex_lock(&metrics_mutex);
+    int count = (all_time_user_count < max_users) ? all_time_user_count : max_users;
+    memcpy(users, all_time_users, count * sizeof(user_info));
+    pthread_mutex_unlock(&metrics_mutex);
+}
+
+static void free_site_visit(site_visit *site) {
+    if (site != NULL) {
+        free(site->destination_host);
+        free(site->destination_port);
+        free(site->method);
+        free(site);
+    }
+}
+
+void metrics_free() {
+    pthread_mutex_lock(&metrics_mutex);
+    for (int i = 0; i < user_count; i++) {
+        for (int i=0; i < active_users[i].site_count; i++) {
+            free_site_visit(&active_users[i].sites_visited[i]);
+        }
+    }
+    pthread_mutex_unlock(&metrics_mutex);
+    pthread_mutex_destroy(&metrics_mutex);
+}
+
