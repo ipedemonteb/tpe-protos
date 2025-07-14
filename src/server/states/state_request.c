@@ -85,6 +85,11 @@ unsigned request_read(struct selector_key *key) {
         selector_set_interest_key(key, OP_WRITE);
         return STATE_REQUEST;
     }
+    if (connection->origin_fd == -2) {
+        write_response(&connection->write_buffer, SERV_ERROR, atyp, host, port);
+        selector_set_interest_key(key, OP_WRITE);
+        return STATE_REQUEST;
+    }
     connection->origin_res = res;
 
     if (selector_fd_set_nio(connection->origin_fd) == -1) {
@@ -215,7 +220,7 @@ int open_socket(const char *host, const char *port, struct addrinfo **res) {
         log(ERROR, "socket() failed: %s", strerror(errno));
         freeaddrinfo(*res);
         *res = NULL;
-        return -1;
+        return -2;
     }
 
     return sockfd;

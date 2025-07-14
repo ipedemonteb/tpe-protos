@@ -15,10 +15,15 @@
 #define IPV6_ATYP 0x04
 #define RSV 0x00
 #define CONNECT_CMD 0x01
+#define SERV_ERROR 0x01
+#define FIREWALL_ERROR 0x02
+#define NETWORK_UNREACHABLE 0x03
+#define EXPIRED_TTL 0x06
+#define UNSUPPORTED_COMMAND 0x07
+#define UNSUPPORTED_ATYP 0x08
 #define HOST_UNREACHABLE 0x04
 #define CONNECTION_REFUSED 0x05
 #define SUCCESS 0x00
-#define UNSUPPORTED_ATYP 0x08
 
 void write_response(struct buffer *write_buff, uint8_t status, uint8_t atyp, char *host, char *port);
 
