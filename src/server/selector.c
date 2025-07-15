@@ -127,6 +127,7 @@ struct item
     const fd_handler *handler;
     void *data;
     struct timeval tv;
+    int to_be_removed; 
 };
 
 /* tarea bloqueante */
@@ -646,6 +647,11 @@ selector_select(fd_selector s)
     for (int i = 0; i <= s->max_fd; i++)
     {
         struct item *item = s->fds + i;
+        if (item->to_be_removed) {
+            selector_unregister_fd(s, i);
+            close(i);
+            item->to_be_removed = 0;
+        }
         if (ITEM_USED(item))
         {
             //printf("timeout: %ul", conf.connect_timeout_microsec);
@@ -750,5 +756,5 @@ void remove_ignored_fd(int fd, void * fds) {
         ignored_fds[fd] = 0; 
     }
     fd_selector selector = (fd_selector)fds;
-    selector->fds[fd].tv.tv_sec = 0;
+    selector->fds[fd].to_be_removed=1;
 }
