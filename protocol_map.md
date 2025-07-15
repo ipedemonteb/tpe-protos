@@ -40,8 +40,6 @@ El servidor debe permitir modificar parámetros de configuración en tiempo real
 
 #### Handshake
 
-- S: [BANNER] [ESPACIO] [VERSION] [\n]
-- C: [BANNER] [ESPACIO] [VERSION] [\n]
 - S: [PROVIDE_CREDENTIALS_BANNER] [\n]
 - C: [USERNAME]:[PASSWORD] [\n]
 - S: [VALID/INVALID_BANNER] [\n]
