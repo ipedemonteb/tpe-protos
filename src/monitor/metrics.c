@@ -100,7 +100,6 @@ static void find_and_update_users(user_info * users, int *current_count, char * 
 
 void metrics_add_user(const char *username) {
     pthread_mutex_lock(&metrics_mutex);
-    
     if (active_user_count < MAX_CONNECTIONS) {
         find_and_update_users(all_time_users, &all_time_user_count, (char *)username);
         find_and_update_users(active_users, &active_user_count, (char *)username);

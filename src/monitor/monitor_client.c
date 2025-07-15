@@ -16,7 +16,6 @@
 #define PROMPT "monitor>"
 #define OK_RESPONSE_PREFIX "OK"
 #define OK_RESPONSE_PREFIX_LEN 2
-#define QUIT_COMMAND "quit"
 #define INITIAL_MESSAGE "Type commands and press Enter. Type 'QUIT' to exit.\n\n"
 
 

@@ -165,8 +165,7 @@ void finish(struct selector_key *key) {
     
     metrics_connection_end();
 
-    //@todo: implementar para usuarios cuando los tengamos
-    metrics_remove_user("anonymous");
+    metrics_remove_user(connection->username);
 
     const int fds[] = {
         connection->client_fd,

@@ -52,7 +52,6 @@ unsigned hello_read(struct selector_key *key) {
             chosen_method = AUTH_METHOD;
         }
     }
-
     // Build the response
     buffer_reset(&connection->write_buffer);
     buffer_write(&connection->write_buffer, SOCKS5_VERSION);
@@ -65,7 +64,7 @@ unsigned hello_read(struct selector_key *key) {
         
         return hello_to_auth_write(key);
     }
-
+    
     strncpy(connection->username, "Anonymous", MAX_USERNAME_LEN);
     metrics_add_user(connection->username);
      

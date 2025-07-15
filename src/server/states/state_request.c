@@ -104,13 +104,13 @@ unsigned request_read(struct selector_key *key) {
         log(ERROR, "Failed to resolve host %s:%s", host, port);
         write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
         selector_set_interest_key(key, OP_WRITE);
-        add_user_site(connection->username[0] ? connection->username : "anonymous", port, host, false);
+        add_user_site(connection->username, port, host, false);
         return STATE_REQUEST;
     }
 
     connection->origin_res = res;
     connection->origin_res_it = res;
-    add_user_site(connection->username[0] ? connection->username : "anonymous", port, host, true);
+    add_user_site(connection->username, port, host, true);
 
     selector_set_interest_key(key, OP_NOOP);
     return connect_write(key);

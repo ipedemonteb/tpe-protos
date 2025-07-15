@@ -262,7 +262,6 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
         char line[256];
         int line_len = 0;
         
-        //@todo: chequear
         while(buffer_can_read(read_buff) && line_len < 255) {
             char c = buffer_read(read_buff);
             if(c == '\n') {
@@ -292,6 +291,7 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                 } else if(strcmp(conn->command, "ACCESS_LOG") == 0) {
                     handle_access_log_user_command(conn, args);
                 } else if(strcmp(conn->command, "QUIT") == 0) {
+                    log(INFO, "I'm here");
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Goodbye\n");
                     buffer_reset(write_buff);
                     size_t response_len = strlen(conn->response);
@@ -312,18 +312,19 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                 } else if(strcmp(conn->command, "ACCESS_LOG") == 0) {
                     handle_access_log_command(conn);
                 }else if(strcmp(conn->command, "QUIT") == 0) {
+                    log(INFO, "I'm not there");
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Goodbye\n");
                     send(fd, conn->response, strlen(conn->response), 0);
                     close(conn->client_fd);
                 } else {
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Unknown command: %s\n", conn->command);
-                }        size_t response_len = strlen(conn->response);
+                }        
+                size_t response_len = strlen(conn->response);
                 for(size_t i = 0; i < response_len; i++) {
                     buffer_write(write_buff, conn->response[i]);
                 }
             }
             
-            //@todo: chequear
             buffer_reset(write_buff);
             size_t response_len = strlen(conn->response);
             for(size_t i = 0; i < response_len; i++) {
@@ -357,7 +358,7 @@ void handle_stats_command(monitor_connection *conn) {
     time_t uptime = metrics_get_server_uptime();
     
     snprintf(conn->response, MAX_RESPONSE_SIZE, 
-             "OK connections:%lu bytes:%lu users:%d concurrent:%lu max_concurrent:%lu uptime:%ld\n",
+             "OK\nall time connections:%lu\nbytes transferred:%lu\nactive users:%d\ncurrent connections:%lu\nmax concurrent connections:%lu\nserver uptime:%ld\n",
              total_conn, total_bytes, user_count, current_conn, max_conn, uptime);
 }
 
@@ -366,7 +367,7 @@ void handle_connections_command(monitor_connection *conn) {
     uint64_t max_conn = metrics_get_max_concurrent_connections();
     
     snprintf(conn->response, MAX_RESPONSE_SIZE, 
-             "OK current:%lu max:%lu\n",
+             "OK\ncurrent connections:%lu\nmax concurrent connections:%lu\n",
              current_conn, max_conn);
 }
 
