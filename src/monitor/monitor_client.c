@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include "../utils/logger.h"
+#include "../server/include/args.h"
 
 #define BUFFER_SIZE 1024
 #define MAX_COMMAND_LENGTH 256
@@ -24,17 +25,10 @@ int authenticate_user(int sock);
 void transmit_mode(int sock);
 
 int main(int argc, char *argv[]) {
-    char *host = DEFAULT_MONITOR_HOST;
-    char *port = DEFAULT_MONITOR_PORT;
+    struct monitor_args args;
+    parse_monitor_args(argc, argv, &args);
     
-    if (argc >= 2) {
-        host = argv[1];
-    }
-    if (argc >= 3) {
-        port = argv[2];
-    }
-    
-    int sock = connect_to_monitor(host, port);
+    int sock = connect_to_monitor(args.addr, args.port);
     if (sock < 0) {
         perror("Failed to connect to monitor server\n");
         return 1;
@@ -128,9 +122,7 @@ int authenticate_user(int sock) {
     buffer[received] = '\0'; 
     printf("%s", buffer);
     if (strncmp(buffer, OK_RESPONSE_PREFIX, OK_RESPONSE_PREFIX_LEN) != 0) {
-       //if (recv(sock, buffer, BUFFER_SIZE - 1, 0) <= 0) {
-            printf("Server closed connection\n");
-        //}
+        printf("Server closed connection\n");
         return -1;
     }
     return 0;

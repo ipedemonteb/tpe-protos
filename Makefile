@@ -5,7 +5,7 @@ SERVER_SRCS := $(wildcard src/server/*.c) $(wildcard src/server/states/*.c) $(wi
 SERVER_OBJS := $(SERVER_SRCS:.c=.o)
 
 # Monitoreo (cliente)
-CLIENT_SRCS := src/monitor/monitor_client.c $(wildcard src/utils/*.c) src/server/buffer.c
+CLIENT_SRCS := src/monitor/monitor_client.c $(wildcard src/utils/*.c) src/server/buffer.c src/server/args.c
 CLIENT_OBJS := $(CLIENT_SRCS:.c=.o)
 
 TARGET := server

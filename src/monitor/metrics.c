@@ -1,7 +1,6 @@
 #include "metrics.h"
 
-#define MAX_USERS 500
-#define MAX_CONNECTIONS 500
+#define MAX_CONNECTIONS 511
 #define INITIAL_SITES_VECTOR_CAPACITY 10
 #define MAX_ALL_TIME_USERS 1000
 
@@ -14,7 +13,7 @@ static uint64_t total_bytes_transferred = 0;
 static time_t server_start_time = 0;
 static struct selector_init *config;
 
-static user_info active_users[MAX_USERS];
+static user_info active_users[MAX_CONNECTIONS];
 static int active_user_count = 0;
 
 static user_info all_time_users[MAX_ALL_TIME_USERS];
@@ -85,7 +84,7 @@ static void find_and_update_users(user_info * users, int *current_count, char * 
             return;
         }
     }
-    if (*current_count < MAX_USERS) {
+    if (*current_count < MAX_CONNECTIONS) {
         strncpy(users[*current_count].username, username, sizeof(users[*current_count].username) - 1);
         users[*current_count].last_seen = time(NULL);
         (*current_count)++;
@@ -95,7 +94,7 @@ static void find_and_update_users(user_info * users, int *current_count, char * 
 void metrics_add_user(const char *username) {
     pthread_mutex_lock(&metrics_mutex);
     
-    if (active_user_count < MAX_USERS) {
+    if (active_user_count < MAX_CONNECTIONS) {
         find_and_update_users(all_time_users, &all_time_user_count, (char *)username);
         find_and_update_users(active_users, &active_user_count, (char *)username);
     }
