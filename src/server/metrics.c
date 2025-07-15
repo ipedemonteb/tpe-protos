@@ -3,6 +3,7 @@
 #define MAX_CONNECTIONS 511
 #define INITIAL_SITES_VECTOR_CAPACITY 10
 #define MAX_ALL_TIME_USERS 1000
+#define ALL_TIME_USERS_INITIAL_CAPACITY 100
 
 static uint64_t total_connections = 0;
 static uint64_t current_connections = 0;
@@ -14,8 +15,10 @@ static struct selector_init *config;
 static user_info active_users[MAX_CONNECTIONS];
 static int active_user_count = 0;
 
-static user_info all_time_users[MAX_ALL_TIME_USERS];
+
+static user_info *all_time_users = NULL;
 static int all_time_user_count = 0;
+static int all_time_user_capacity = 0;
 
 void change_timeout(int seconds) {
     update_connect_timeout(seconds * 1000000);
@@ -42,12 +45,50 @@ static void add_user_site(user_info *user_info, int * site_count, bool success, 
     return;
 }
 
+static void find_and_update_active_users(const char *username) {
+    for (int i = 0; i < active_user_count; i++) {
+        if (strcmp(active_users[i].username, username) == 0) {
+            active_users[i].last_seen = time(NULL);
+            return;
+        }
+    }
+    if (active_user_count < MAX_CONNECTIONS) {
+        strncpy(active_users[active_user_count].username, username, sizeof(active_users[active_user_count].username) - 1);
+        active_users[active_user_count].last_seen = time(NULL);
+        active_user_count++;
+    }
+}
+
+static void find_and_update_all_time_users(const char *username) {
+    for (int i = 0; i < all_time_user_count; i++) {
+        if (strcmp(all_time_users[i].username, username) == 0) {
+            all_time_users[i].last_seen = time(NULL);
+            return;
+        }
+    }
+    if (all_time_user_count >= all_time_user_capacity) {
+        int new_capacity = (all_time_user_capacity > 0) ? all_time_user_capacity * 2 : ALL_TIME_USERS_INITIAL_CAPACITY;
+        user_info *new_array = realloc(all_time_users, sizeof(user_info) * new_capacity);
+        if (new_array == NULL) {
+            return;
+        }
+        all_time_users = new_array;
+        all_time_user_capacity = new_capacity;
+    }
+    memset(&all_time_users[all_time_user_count], 0, sizeof(user_info));
+    strncpy(all_time_users[all_time_user_count].username, username, sizeof(all_time_users[all_time_user_count].username) - 1);
+    all_time_users[all_time_user_count].last_seen = time(NULL);
+    all_time_user_count++;
+}
+
 void metrics_init(struct selector_init *conf) {
     config = conf;
     server_start_time = time(NULL);
     memset(active_users, 0, sizeof(active_users));
-    memset(all_time_users, 0, sizeof(all_time_users));
     active_user_count = 0;
+    all_time_user_capacity = ALL_TIME_USERS_INITIAL_CAPACITY;
+    all_time_users = malloc(sizeof(user_info) * all_time_user_capacity);
+    all_time_user_count = 0;
 }
 
 int metrics_connection_start() {
@@ -72,25 +113,9 @@ void metrics_bytes_transferred(ssize_t bytes) {
     total_bytes_transferred += bytes;
 }
 
-static void find_and_update_users(user_info * users, int *current_count, char * username) {
-    for (int i = 0; i < *current_count; i++) {
-        if (strcmp(users[i].username, username) == 0) {
-            users[i].last_seen = time(NULL);
-            return;
-        }
-    }
-    if (*current_count < MAX_CONNECTIONS) {
-        strncpy(users[*current_count].username, username, sizeof(users[*current_count].username) - 1);
-        users[*current_count].last_seen = time(NULL);
-        (*current_count)++;
-    }
-}
-
 void metrics_add_user(const char *username) {
-    if (active_user_count < MAX_CONNECTIONS) {
-        find_and_update_users(all_time_users, &all_time_user_count, (char *)username);
-        find_and_update_users(active_users, &active_user_count, (char *)username);
-    }
+    find_and_update_active_users(username);
+    find_and_update_all_time_users(username);
 }
 
 void metrics_remove_user(const char *username) {
@@ -172,5 +197,7 @@ void metrics_get_all_time_users(user_info *users, int max_users) {
 
 
 void metrics_free() {
-    // Add frees if necessary
+    if (all_time_users != NULL) {
+        free(all_time_users);
+    }
 }
