@@ -64,7 +64,8 @@ selector_error(const selector_status status)
 unsigned int connect_timeout_microsec = DEFAULT_CONNECT_TIMEOUT_MICROSEC;
 
 static void
-wake_handler(const int signal)
+wake_handler(const int /*signal*/)
+
 {
     // nada que hacer. está solo para interrumpir el select
 }
@@ -257,7 +258,7 @@ items_max_fd(fd_selector s)
 }
 
 static void
-items_update_fdset_for_fd(fd_selector s, const struct item *item)
+items_update_fdset_for_fd(fd_selector s, struct item *item)
 {
     FD_CLR(item->fd, &s->master_r);
     FD_CLR(item->fd, &s->master_w);
