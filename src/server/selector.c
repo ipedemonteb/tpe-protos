@@ -50,6 +50,8 @@ selector_error(const selector_status status)
     return msg;
 }
 
+unsigned int connect_timeout_microsec = DEFAULT_CONNECT_TIMEOUT_MICROSEC;
+
 static void
 wake_handler(const int signal)
 {
@@ -64,7 +66,6 @@ selector_status
 selector_init(const struct selector_init *c)
 {
     memcpy(&conf, c, sizeof(conf));
-
     // inicializamos el sistema de comunicación entre threads y el selector
     // principal. La técnica se encuentra descripta en
     // "The new pselect() system call" <https://lwn.net/Articles/176911/>
@@ -625,22 +626,23 @@ finally:
 selector_status
 selector_select(fd_selector s)
 {
-
+    printf("Selecting...\n");
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
-    long filedescriptor_timeout = 10 * 1000000; 
 
     for (int i = 0; i <= s->max_fd; i++)
     {
         struct item *item = s->fds + i;
         if (ITEM_USED(item))
         {
-            if ((item->fd != 0 && item->fd != 3)&&(tv.tv_sec - item->tv.tv_sec) * 1000000 + (tv.tv_usec - item->tv.tv_usec) > filedescriptor_timeout)
+            //printf("timeout: %ul", conf.connect_timeout_microsec);
+            if ((item->fd != 0 && item->fd != 3)&&(tv.tv_sec - item->tv.tv_sec) * 1000000 + (tv.tv_usec - item->tv.tv_usec) > connect_timeout_microsec)
             {
+                printf("FD %d timed out with time diff being %ld microseconds\n", item->fd, (tv.tv_sec - item->tv.tv_sec) * 1000000 + (tv.tv_usec - item->tv.tv_usec));
                 selector_unregister_fd(s, i);
                 close(i);
-            }
+            } 
         }
     }
 
@@ -649,6 +651,8 @@ selector_select(fd_selector s)
     memcpy(&s->slave_r, &s->master_r, sizeof(s->slave_r));
     memcpy(&s->slave_w, &s->master_w, sizeof(s->slave_w));
     memcpy(&s->slave_t, &s->master_t, sizeof(s->slave_t));
+
+
 
     s->selector_thread = pthread_self();
 
@@ -710,4 +714,9 @@ int selector_fd_set_nio(const int fd)
         }
     }
     return ret;
+}
+
+void update_connect_timeout(unsigned int timeout_microsec){
+    connect_timeout_microsec = timeout_microsec;
+    printf("UPDATE CONNECT TIMEOUT: %u microseconds\n", connect_timeout_microsec);
 }

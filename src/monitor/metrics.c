@@ -1,5 +1,7 @@
 #include "metrics.h"
 
+#include "../server/include/selector.h"
+
 #define MAX_USERS 500
 #define MAX_CONNECTIONS 500
 #define INITIAL_SITES_VECTOR_CAPACITY 10
@@ -20,6 +22,11 @@ static int active_user_count = 0;
 static user_info all_time_users[MAX_ALL_TIME_USERS];
 static int all_time_user_count = 0;
 
+void change_timeout(int seconds) {
+    pthread_mutex_lock(&metrics_mutex);
+    update_connect_timeout(seconds * 1000000);
+    pthread_mutex_unlock(&metrics_mutex);
+}
 
 static void add_user_site(user_info *user_info, int * site_count, bool success, char * destination_port, char *site) {
     if (site == NULL || user_info == NULL) {
@@ -162,21 +169,6 @@ void metrics_get_users(user_info *users, int max_users) {
     int count = (active_user_count < max_users) ? active_user_count : max_users;
     memcpy(users, active_users, count * sizeof(user_info));
     pthread_mutex_unlock(&metrics_mutex);
-}
-
-int metrics_get_timeout() {
-    pthread_mutex_lock(&metrics_mutex);
-    int timeout = (int) config->select_timeout.tv_sec;
-    pthread_mutex_unlock(&metrics_mutex);
-    return timeout;
-}
-
-void metrics_set_timeout(int seconds) {
-    pthread_mutex_lock(&metrics_mutex);
-    int old_timeout = (int) config->select_timeout.tv_sec;
-    config->select_timeout.tv_sec = seconds;
-    pthread_mutex_unlock(&metrics_mutex);
-    log(INFO, "Timeout changed from %d to %d seconds", old_timeout, seconds);
 }
 
 int metrics_get_max_connections() {

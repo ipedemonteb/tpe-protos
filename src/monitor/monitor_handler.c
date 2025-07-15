@@ -290,8 +290,6 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                     handle_users_command(conn);
                 } else if(strcmp(conn->command, "CONFIG") == 0) {
                     handle_config_command(conn, args);
-                } else if(strcmp(conn->command, "TIMEOUT") == 0) {
-                    handle_timeout_command(conn);
                 } else if(strcmp(conn->command, "ACCESS_LOG") == 0) {
                     handle_access_log_user_command(conn, args);
                 } else {
@@ -426,7 +424,7 @@ void handle_config_command(monitor_connection *conn, const char *args) {
         if (strcmp(param, "timeout") == 0) {
             int timeout = atoi(value);
             if (timeout > 0) {
-                metrics_set_timeout(timeout);
+                change_timeout(timeout);
                 snprintf(conn->response, MAX_RESPONSE_SIZE, "OK timeout set to %d\n", timeout);
             } else {
                 snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Invalid timeout value\n");
@@ -438,11 +436,6 @@ void handle_config_command(monitor_connection *conn, const char *args) {
         snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Usage: CONFIG <param> <value>\n");
     }
 }
-
-void handle_timeout_command(monitor_connection *conn) {
-    int current_timeout = metrics_get_timeout();
-    snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Current timeout: %d seconds\n", current_timeout);
-} 
 
 void handle_access_log_command(monitor_connection *conn) {
     user_info users[MAX_USERS];
