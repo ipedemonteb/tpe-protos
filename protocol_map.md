@@ -23,14 +23,13 @@
 
 ### Métricas y Monitoreo
 
-El servidor debe recolectar y exponer métricas útiles para el monitoreo, incluyendo pero no limitado a:
+El servidor recolecta y expone métricas útiles para el monitoreo:
 
 - Cantidad de conexiones históricas.
 - Cantidad de conexiones concurrentes.
 - Cantidad de bytes transferidos.
-- Otras métricas relevantes para entender el funcionamiento dinámico del sistema.
 
-Las métricas pueden ser volátiles (se pierden si el servidor se reinicia).
+Las métricas son volátiles.
 
 ### Configuración Dinámica
 
