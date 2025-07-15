@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <time.h>
 #include <sys/types.h>
-#include <pthread.h>
 #include <string.h>
 #include <time.h>
 #include "../utils/logger.h"
