@@ -56,7 +56,7 @@ int init_server(char *serv_port, char *monitor_port) {
     struct selector_init conf = {
         .signal = SIGALRM,
         .select_timeout = {
-            .tv_sec = 10,
+            .tv_sec = 1,
             .tv_nsec = 0,
         },
     };
@@ -75,12 +75,18 @@ int init_server(char *serv_port, char *monitor_port) {
         goto finally;
     }
 
+    printf("FD for server socket: %d\n", serv_sock);
+    add_ignored_fd(serv_sock);
+
     // Initialize the monitor socket
     int monitor_sock = setup_TCP_server_socket(monitor_port);
     if (monitor_sock < 0 ) {
         err_msg = "Failed to initialize monitor socket";
         goto finally;
     }
+    
+    printf("FD for monitor socket: %d\n", monitor_sock);
+    add_ignored_fd(monitor_sock);
 
     signal(SIGTERM, sigterm_handler);
     signal(SIGINT, sigterm_handler);

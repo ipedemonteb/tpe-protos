@@ -22,6 +22,36 @@
 
 #define ERROR_DEFAULT_MSG "something failed"
 
+
+int ignored_fds[FD_SETSIZE] = {0}; 
+
+void add_ignored_fd(int fd) {
+    if (fd < 0 || fd >= FD_SETSIZE) {
+        return; 
+    }
+    if (ignored_fds[fd] == 0) {
+        ignored_fds[fd] = 1; 
+    }
+}
+
+void remove_ignored_fd(int fd) {
+    if (fd < 0 || fd >= FD_SETSIZE) {
+        return; // Invalid fd, do nothing
+    }
+    if (ignored_fds[fd] == 1) {
+        ignored_fds[fd] = 0; 
+    }
+    
+}
+
+static int ignored_fd(int fd) {
+    if (fd < 0 || fd >= FD_SETSIZE) {
+        return 0; 
+    }
+    return ignored_fds[fd] == 1;
+}
+
+
 /** retorna una descripción humana del fallo */
 const char *
 selector_error(const selector_status status)
@@ -626,7 +656,7 @@ finally:
 selector_status
 selector_select(fd_selector s)
 {
-    printf("Selecting...\n");
+    printf("SELECTOR SELECT\n");
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
@@ -637,7 +667,7 @@ selector_select(fd_selector s)
         if (ITEM_USED(item))
         {
             //printf("timeout: %ul", conf.connect_timeout_microsec);
-            if ((item->fd != 0 && item->fd != 3)&&(tv.tv_sec - item->tv.tv_sec) * 1000000 + (tv.tv_usec - item->tv.tv_usec) > connect_timeout_microsec)
+            if (!ignored_fd(item->fd)&&(tv.tv_sec - item->tv.tv_sec) * 1000000 + (tv.tv_usec - item->tv.tv_usec) > connect_timeout_microsec)
             {
                 printf("FD %d timed out with time diff being %ld microseconds\n", item->fd, (tv.tv_sec - item->tv.tv_sec) * 1000000 + (tv.tv_usec - item->tv.tv_usec));
                 selector_unregister_fd(s, i);

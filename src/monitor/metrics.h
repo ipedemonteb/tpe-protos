@@ -54,6 +54,5 @@ int metrics_get_max_connections();
 
 int metrics_get_all_time_user_count();
 void metrics_get_all_time_users(user_info *users, int max_users);
-void change_timeout(int seconds);
 
 #endif 

@@ -1,6 +1,5 @@
 #include "metrics.h"
 
-#include "../server/include/selector.h"
 
 #define MAX_USERS 500
 #define MAX_CONNECTIONS 500
@@ -21,12 +20,6 @@ static int active_user_count = 0;
 
 static user_info all_time_users[MAX_ALL_TIME_USERS];
 static int all_time_user_count = 0;
-
-void change_timeout(int seconds) {
-    pthread_mutex_lock(&metrics_mutex);
-    update_connect_timeout(seconds * 1000000);
-    pthread_mutex_unlock(&metrics_mutex);
-}
 
 static void add_user_site(user_info *user_info, int * site_count, bool success, char * destination_port, char *site) {
     if (site == NULL || user_info == NULL) {

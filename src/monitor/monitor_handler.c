@@ -1,4 +1,5 @@
 #include "monitor_handler.h"
+#include "../server/include/selector.h"
 
 //@todo: deberíamos tener un archivo de configuración para estos valores?
 #define USERNAME_MAX_LEN 32
@@ -12,6 +13,10 @@
 #define INVALID_CREDENTIALS_FORMAT_MSG_LEN 51
 #define MAX_CONFIG_PARAM_LEN 64
 #define INITIAL_USER_LIST_CAPACITY 1463
+
+void change_timeout(int seconds) {
+    update_connect_timeout(seconds * 1000000);
+}
 
 static const struct fd_handler monitor_handler = {
     .handle_read = monitor_read,
@@ -43,6 +48,7 @@ int parse_username_password(const char *input, char *username, char *password) {
 
 void monitor_accept_connection(struct selector_key *key) {
     int server_fd = key->fd;
+    add_ignored_fd(server_fd);
     log(DEBUG, "ME ACTIVO");
     fd_selector selector = key->data;
     struct sockaddr_storage client_addr;
@@ -54,6 +60,7 @@ void monitor_accept_connection(struct selector_key *key) {
         log(ERROR, "monitor accept() failed: %s", strerror(errno));
         return;
     }
+    add_ignored_fd(client_fd);
 
     // Set the client socket to non-blocking
     if(selector_fd_set_nio(client_fd) == -1) {
@@ -77,6 +84,8 @@ void monitor_accept_connection(struct selector_key *key) {
     new_connection->client_fd = client_fd;
     new_connection->handshake_done = 0;
     new_connection->state = MONITOR_HANDSHAKE_WRITE;
+
+
 
     const char *banner = "Please enter Username:password (in that format)\n";
     size_t banner_len = strlen(banner);
