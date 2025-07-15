@@ -94,5 +94,6 @@ S> OK Access log for user a:
 C> CONFIG timeout 15
 S> OK timeout set to 15
 C> QUIT
+S> OK Goodbye
 [S: Conexión cerrada]
 ```
