@@ -8,7 +8,7 @@
 - `CONFIG <param> <value>`: Cambia configuración en tiempo real.
     - Ejemplo: `CONFIG timeout 30` (cambia el timeout a 30 segundos)
     - Ejemplo: `CONFIG max_connections 1000` (cambia el máximo de conexiones a 1000)
-- `QUIT`: Sale del cliente.
+- `QUIT`: Cierra la conexión.
 
 
 ### Decisiones
