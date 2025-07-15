@@ -75,13 +75,15 @@ static unsigned auth_write_aux(struct selector_key *key, uint8_t auth_status, un
         log(ERROR, "send() failed in auth_write: %s (errno: %d)", strerror(errno), errno);
         return STATE_ERROR;
     }
+
     buffer_read_adv(&connection->write_buffer, sent);
     if (buffer_can_read(&connection->write_buffer)) {
         return current_state;
     }
 
     if (auth_status != 0x00) {
-        return STATE_DONE;
+        return STATE_HELLO_TO_AUTH;
+        //NOT STATE_DONE
     }
 
     selector_set_interest_key(key, OP_READ);

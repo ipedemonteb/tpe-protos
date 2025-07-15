@@ -79,7 +79,7 @@ void socks5_stm_close(struct selector_key *key) {
     }
 
     if (connection->origin_res != NULL) {
-        freeaddrinfo(connection->origin_res);
+        if (connection->origin_fd>=0)freeaddrinfo(connection->origin_res);
         connection->origin_res = NULL;
     }
 
