@@ -1,6 +1,6 @@
 #include "../include/socks5_handler.h"
 #include "include/state_utils.h"
-#include "../../monitor/metrics.h"
+#include "../include/metrics.h"
 
 int get_ipv4_address(struct buffer *buff, char *host, char *port);
 int get_domain_name(char *host, char *port, struct buffer *buff);

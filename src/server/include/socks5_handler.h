@@ -13,16 +13,16 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <netdb.h>
-#include "selector.h"
-#include "buffer.h"
-#include "stm.h"
-#include "../../utils/logger.h"
+#include "../utils/include/selector.h"
+#include "../utils/include/buffer.h"
+#include "../utils/include/stm.h"
+#include "../../shared/include/logger.h"
+#include "../include/defines.h"
 #include "../states/include/state_hello.h"
 #include "../states/include/state_connect.h"
-#include "../states/include/state_auth.h"
 #include "../states/include/state_request.h"
 #include "../states/include/state_forward.h"
-#include "../include/defines.h"
+#include "../states/include/state_auth.h"
 
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))

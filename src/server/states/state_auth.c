@@ -1,5 +1,5 @@
 #include "include/state_auth.h"
-#include "../../monitor/metrics.h"
+#include "../include/metrics.h"
 
 unsigned auth_read(struct selector_key *key) {
     socks5_connection *connection = key->data;

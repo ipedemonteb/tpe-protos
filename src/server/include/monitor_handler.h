@@ -11,10 +11,10 @@
 #include <unistd.h>
 #include <time.h>
 #include "metrics.h"
-#include "../utils/logger.h"
-#include "../server/include/selector.h"
-#include "../server/include/buffer.h"
-#include "../server/include/user_auth_utils.h"
+#include "../../shared/include/logger.h"
+#include "../utils/include/selector.h"
+#include "../utils/include/buffer.h"
+#include "../utils/include/user_auth_utils.h"
 
 #define MONITOR_BUFFER_SIZE 1024
 #define MAX_COMMAND_SIZE 256

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <string.h>
-#include "../../include/buffer.h"
+#include "../../utils/include/buffer.h"
 
 #define SOCKS5_VERSION 0x05
 #define AUTH_VERSION 0x01

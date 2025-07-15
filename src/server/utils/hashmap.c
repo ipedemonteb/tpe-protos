@@ -1,4 +1,4 @@
-#include "hashmap.h"
+#include "include/hashmap.h"
 
 // djb2
 static unsigned long _hash(const char *str)

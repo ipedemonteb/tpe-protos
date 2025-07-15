@@ -8,13 +8,13 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <errno.h>
-#include "../monitor/metrics.h"
-#include "../monitor/monitor_handler.h"
-#include "../utils/logger.h"
-#include "include/server_utils.h"
-#include "include/selector.h"
+#include "include/metrics.h"
+#include "include/monitor_handler.h"
+#include "../shared/include/logger.h"
+#include "utils/include/server_utils.h"
+#include "utils/include/selector.h"
 #include "include/socks5_handler.h"
-#include "include/args.h"
+#include "../shared/include/args.h"
 
 #define INIT_ELEMENTS 1024
 #define DEFAULT_PORT "1080"

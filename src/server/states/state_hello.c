@@ -1,6 +1,6 @@
 #include "include/state_hello.h"
 #include "../include/socks5_handler.h"
-#include "../../monitor/metrics.h"
+#include "../include/metrics.h"
 
 unsigned hello_read(struct selector_key *key) {
     socks5_connection *connection = key->data;

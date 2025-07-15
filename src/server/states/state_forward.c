@@ -1,6 +1,6 @@
 #include "include/state_forward.h"
 #include "../include/socks5_handler.h"
-#include "../../monitor/metrics.h"
+#include "../include/metrics.h"
 
 static int forward_send(int fd, struct buffer *src_buf) {
     size_t wn;

@@ -1,14 +1,14 @@
 #ifndef METRICS_H_
 #define METRICS_H_
 
-#include "../server/include/selector.h"
+#include "../utils/include/selector.h"
 #include <stdint.h>
 #include <time.h>
 #include <sys/types.h>
 #include <string.h>
 #include <time.h>
-#include "../utils/logger.h"
-#include "../server/include/defines.h"
+#include "../../shared/include/logger.h"
+#include "defines.h"
 #define MAX_HOSTNAME_LEN 256
 #define MAX_PORT_LEN 6
 #define MAX_METHOD_LEN 16

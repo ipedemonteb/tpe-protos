@@ -6,8 +6,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include "../utils/logger.h"
-#include "../server/include/args.h"
+#include "../shared/include/logger.h"
+#include "../shared/include/args.h"
 
 #define BUFFER_SIZE 1024
 #define MAX_COMMAND_LENGTH 256

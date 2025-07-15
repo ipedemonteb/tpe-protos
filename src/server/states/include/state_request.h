@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <arpa/inet.h>
-#include "../../include/selector.h"
+#include "../../utils/include/selector.h"
 #include "state_utils.h"
 
 unsigned request_read(struct selector_key *key);

@@ -1,32 +1,42 @@
-SRC_DIRS := src/server src/server/states src/utils src/monitor
+include ./Makefile.inc
 
-# Servidores principales (SOCKS5 y servidor monitoreo)
-SERVER_SRCS := $(wildcard src/server/*.c) $(wildcard src/server/states/*.c) $(wildcard src/utils/*.c) $(filter-out src/monitor/monitor_client.c, $(wildcard src/monitor/*.c))
-SERVER_OBJS := $(SERVER_SRCS:.c=.o)
+SERVER_SOURCES=$(wildcard src/server/*.c) $(wildcard src/server/states/*.c) $(wildcard src/server/utils/*.c)
+MONITOR_SOURCES=src/client/monitor_client.c
+SHARED_SOURCES=$(wildcard src/shared/*.c)
 
-# Monitoreo (cliente)
-CLIENT_SRCS := src/monitor/monitor_client.c $(wildcard src/utils/*.c) src/server/buffer.c src/server/args.c
-CLIENT_OBJS := $(CLIENT_SRCS:.c=.o)
+OUTPUT_FOLDER=./bin
+OBJECTS_FOLDER=./obj
 
-TARGET := server
-CLIENT_TARGET := monitor_client
+SERVER_OBJECTS=$(SERVER_SOURCES:src/%.c=obj/%.o)
+MONITOR_OBJECTS=$(MONITOR_SOURCES:src/%.c=obj/%.o)
+SHARED_OBJECTS=$(SHARED_SOURCES:src/%.c=obj/%.o)
 
-CC := gcc
-CFLAGS := -Wall -Wextra -g -pthread -fsanitize=address
-LDFLAGS := -pthread -fsanitize=address
+SERVER_OUTPUT_FILE=$(OUTPUT_FOLDER)/server
+MONITOR_OUTPUT_FILE=$(OUTPUT_FOLDER)/monitor_client
 
-all: $(TARGET) $(CLIENT_TARGET)
+all: server monitor_client
 
-$(TARGET): $(SERVER_OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS) 
+server: $(SERVER_OUTPUT_FILE)
+monitor_client: $(MONITOR_OUTPUT_FILE)
 
-$(CLIENT_TARGET): $(CLIENT_OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS)
+$(SERVER_OUTPUT_FILE): $(SERVER_OBJECTS) $(SHARED_OBJECTS)
+	mkdir -p $(OUTPUT_FOLDER)
+	$(COMPILER) $(LDFLAGS) $(SERVER_OBJECTS) $(SHARED_OBJECTS) -o $(SERVER_OUTPUT_FILE)
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+$(MONITOR_OUTPUT_FILE): $(MONITOR_OBJECTS) $(SHARED_OBJECTS)
+	mkdir -p $(OUTPUT_FOLDER)
+	$(COMPILER) $(LDFLAGS) $(MONITOR_OBJECTS) $(SHARED_OBJECTS) -o $(MONITOR_OUTPUT_FILE)
 
 clean:
-	rm -f $(SERVER_OBJS) $(CLIENT_OBJS) $(TARGET) $(CLIENT_TARGET)
+	rm -rf $(OUTPUT_FOLDER)
+	rm -rf $(OBJECTS_FOLDER)
 
-.PHONY: all clean
+obj/%.o: src/%.c
+	mkdir -p $(OBJECTS_FOLDER)/server
+	mkdir -p $(OBJECTS_FOLDER)/server/states
+	mkdir -p $(OBJECTS_FOLDER)/server/utils
+	mkdir -p $(OBJECTS_FOLDER)/client
+	mkdir -p $(OBJECTS_FOLDER)/shared
+	$(COMPILER) $(COMPILERFLAGS) -c $< -o $@
+
+.PHONY: all server monitor_client clean

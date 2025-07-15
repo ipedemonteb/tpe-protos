@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "../utils/hashmap.h"
+#include "include/hashmap.h"
 #include "include/user_auth_utils.h"
 
 #define HASHMAP_SIZE 32
@@ -48,7 +48,6 @@ static int _fetch_user_credentials()
     fread(user_credentials->entries, sizeof(static_entry), user_credentials->capacity, file);
     fclose(file);
 
-    printHash();
     return 0;
 }
 
@@ -107,7 +106,6 @@ void create_user_credentials(const char *username, const char *password){
     if (user_password == NULL){
         hashmap_insert(user_credentials, username, password);
         _persist_user_credentials();
-        printHash();
     } else {
         printf("User %s already exists.\n", username);
     }

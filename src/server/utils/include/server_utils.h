@@ -10,8 +10,8 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include "selector.h"
-#include "../../utils/logger.h"
-#include "../../utils/util.h"
+#include "../../../shared/include/logger.h"
+#include "../../../shared/include/util.h"
 
 
 // Create, bind, and listen a new TCP server socket

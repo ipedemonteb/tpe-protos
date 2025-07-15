@@ -37,7 +37,6 @@
 *.hex
 
 # Program output
-server
 monitor_client
 
 # Debug files
