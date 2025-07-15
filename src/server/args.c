@@ -73,6 +73,20 @@ usage(const char* progname)
     exit(1);
 }
 
+static void
+usage_monitor(const char* progname)
+{
+    fprintf(stderr,
+            "Usage: %s [OPTION]...\n"
+            "\n"
+            "   -h               Imprime la ayuda y termina.\n"
+            "   -L <conf addr>   Dirección del servicio de management.\n"
+            "   -P <conf port>   Puerto del servicio de management.\n"
+            "\n",
+            progname);
+    exit(1);
+}
+
 void
 parse_args(const int argc, char** argv, struct socks5args* args)
 {
@@ -135,6 +149,54 @@ parse_args(const int argc, char** argv, struct socks5args* args)
         case 'v':
             version();
             exit(0);
+        default:
+            fprintf(stderr, "unknown argument %d.\n", c);
+            exit(1);
+        }
+    }
+    if (optind < argc)
+    {
+        fprintf(stderr, "argument not accepted: ");
+        while (optind < argc)
+        {
+            fprintf(stderr, "%s ", argv[optind++]);
+        }
+        fprintf(stderr, "\n");
+        exit(1);
+    }
+}
+
+void
+parse_monitor_args(const int argc, char** argv, struct monitor_args* args)
+{
+    memset(args, 0, sizeof(*args));
+
+    args->addr = "127.0.0.1";
+    args->port = "8080";
+
+    int c;
+    while (true)
+    {
+        int option_index = 0;
+        static struct option long_options[] = {
+            {0, 0, 0, 0}
+        };
+
+        c = getopt_long(argc, argv, "hL:P:", long_options, &option_index);
+        if (c == -1)
+            break;
+
+        switch (c)
+        {
+        case 'h':
+            usage_monitor(argv[0]);
+            break;
+        case 'L':
+            args->addr = optarg;
+            break;
+        case 'P':
+            args->port = port(optarg);
+            break;
         default:
             fprintf(stderr, "unknown argument %d.\n", c);
             exit(1);

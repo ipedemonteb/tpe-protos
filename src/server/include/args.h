@@ -24,6 +24,12 @@ struct socks5args
     struct users users[MAX_USERS];
 };
 
+struct monitor_args
+{
+    char* addr;
+    char* port;
+};
+
 /**
  * Interpreta la linea de comandos (argc, argv) llenando
  * args con defaults o la seleccion humana. Puede cortar
@@ -31,5 +37,8 @@ struct socks5args
  */
 void
 parse_args(const int argc, char** argv, struct socks5args* args);
+
+void 
+parse_monitor_args(const int argc, char** argv, struct monitor_args* args);
 
 #endif
