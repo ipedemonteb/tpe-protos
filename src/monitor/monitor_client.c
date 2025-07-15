@@ -97,32 +97,34 @@ int authenticate_user(int sock) {
     
     printf("%s", buffer);
     fflush(stdout);
-    
-    if (fgets(buffer, BUFFER_SIZE, stdin) == NULL) {
-        perror("Failed to read user input\n");
-        return -1;
-    }
-    size_t credentials_len = strcspn(buffer, "\n");
-    buffer[credentials_len] = '\n';
-    credentials_len++;
-    buffer[credentials_len + 1] = '\0';
-    
-    ssize_t sent = send(sock, buffer, credentials_len, 0);
-    if (sent < 0) {
-        perror("send");
-        return -1;
-    }
-    
-    received = recv(sock, buffer, BUFFER_SIZE - 1, 0);
-    if (received <= 0) {
-        perror("Failed to receive server response\n");
-        return -1;
-    }
-    buffer[received] = '\0'; 
-    printf("%s", buffer);
-    if (strncmp(buffer, OK_RESPONSE_PREFIX, OK_RESPONSE_PREFIX_LEN) != 0) {
-        printf("Server closed connection\n");
-        return -1;
+
+    int authenticated = 0;
+    while (!authenticated) {
+        if (fgets(buffer, BUFFER_SIZE, stdin) == NULL) {
+            perror("Failed to read user input\n");
+            return -1;
+        }
+        size_t credentials_len = strcspn(buffer, "\n");
+        buffer[credentials_len] = '\n';
+        credentials_len++;
+        buffer[credentials_len + 1] = '\0';
+        
+        ssize_t sent = send(sock, buffer, credentials_len, 0);
+        if (sent < 0) {
+            perror("send");
+            return -1;
+        }
+        
+        received = recv(sock, buffer, BUFFER_SIZE - 1, 0);
+        if (received <= 0) {
+            perror("Failed to receive server response\n");
+            return -1;
+        }
+        buffer[received] = '\0'; 
+        printf("%s", buffer);
+        if (strncmp(buffer, OK_RESPONSE_PREFIX, OK_RESPONSE_PREFIX_LEN) == 0) {
+            authenticated = 1;
+        }
     }
     return 0;
 }
