@@ -1,5 +1,6 @@
 #include "include/state_hello.h"
 #include "../include/socks5_handler.h"
+#include "../../monitor/metrics.h"
 
 unsigned hello_read(struct selector_key *key) {
     socks5_connection *connection = key->data;
@@ -66,6 +67,7 @@ unsigned hello_read(struct selector_key *key) {
     }
 
     strncpy(connection->username, "Anonymous", MAX_USERNAME_LEN);
+    metrics_add_user(connection->username);
      
     return hello_write(key);
 }

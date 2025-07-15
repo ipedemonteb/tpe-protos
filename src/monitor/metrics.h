@@ -24,7 +24,6 @@ typedef struct {
 }site_visit;
 typedef struct {
     char username[MAX_USERNAME_LEN];
-    char ip_address[MAX_IP_LEN];
     time_t last_seen;
     site_visit * sites_visited;
     int site_count;
@@ -38,7 +37,7 @@ void metrics_connection_end();
 void metrics_bytes_transferred(ssize_t bytes);
 void metrics_add_user_site(const char *username, char *site, int success, char * destination_port);
 
-void metrics_add_user(const char *username, const char *ip_address);
+void metrics_add_user(const char *username);
 void metrics_remove_user(const char *username);
 
 uint64_t metrics_get_total_connections();

@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include "../utils/logger.h"
 
 #define BUFFER_SIZE 1024
 #define MAX_COMMAND_LENGTH 256
@@ -68,7 +69,6 @@ int connect_to_monitor(const char *host, const char *port) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
         return -1;
     }
-    
     for (rp = result; rp != NULL; rp = rp->ai_next) {
         sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         if (sock == -1) {
@@ -95,7 +95,7 @@ int connect_to_monitor(const char *host, const char *port) {
 int authenticate_user(int sock) {
     char buffer[BUFFER_SIZE];
     
-    ssize_t received = recv(sock, buffer, BUFFER_SIZE - 1, 0);
+    ssize_t received = recv(sock, buffer, BUFFER_SIZE, 0);
     if (received <= 0) {
         perror("Failed to receive server banner\n");
         return -1;
@@ -128,9 +128,9 @@ int authenticate_user(int sock) {
     buffer[received] = '\0'; 
     printf("%s", buffer);
     if (strncmp(buffer, OK_RESPONSE_PREFIX, OK_RESPONSE_PREFIX_LEN) != 0) {
-        if (recv(sock, buffer, BUFFER_SIZE - 1, 0) <= 0) {
+       //if (recv(sock, buffer, BUFFER_SIZE - 1, 0) <= 0) {
             printf("Server closed connection\n");
-        }
+        //}
         return -1;
     }
     return 0;

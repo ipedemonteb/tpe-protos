@@ -8,8 +8,8 @@
 #define MONITOR_VERSION "1.0"
 #define INVALID_CREDENTIALS_MSG "ERR Invalid credentials\n"
 #define INVALID_CREDENTIALS_MSG_LEN 24
-#define INVALID_CREDENTAILS_FORMAT_MSG "ERR Invalid format. Use username:password\n"
-#define INVALID_CREDENTAILS_FORMAT_MSG_LEN 51
+#define INVALID_CREDENTIALS_FORMAT_MSG "ERR Invalid format. Use username:password\n"
+#define INVALID_CREDENTIALS_FORMAT_MSG_LEN 51
 #define MAX_CONFIG_PARAM_LEN 64
 #define INITIAL_USER_LIST_CAPACITY 1463
 
@@ -43,6 +43,7 @@ int parse_username_password(const char *input, char *username, char *password) {
 
 void monitor_accept_connection(struct selector_key *key) {
     int server_fd = key->fd;
+    log(DEBUG, "ME ACTIVO");
     fd_selector selector = key->data;
     struct sockaddr_storage client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
@@ -216,23 +217,19 @@ int handle_monitor_handshake_read(struct buffer *read_buff, int fd) {
                 log(INFO, "monitor: successful authentication for user '%s'", username);
                 return 0;
             } else {
-                ssize_t sent = send(fd, INVALID_CREDENTIALS_MSG, INVALID_CREDENTIALS_MSG_LEN, 0);
+                ssize_t sent = send(fd, INVALID_CREDENTIALS_MSG, strlen(INVALID_CREDENTIALS_MSG), 0);
                 if (sent < 0) {
                     log(ERROR, "monitor: failed to send error message: %s", strerror(errno));
                 }
                 log(ERROR, "monitor: invalid credentials from user '%s', closing connection", username);
-                //@todo: parece mejor estilo que parsear por ERR pero no se bien como incorporarlo
-                shutdown(fd, SHUT_RDWR);
-                close(fd);
                 return -1;
             }
         } else {
             log(INFO, "monitor: invalid username:password format: '%s'", line);
-            ssize_t sent = send(fd, INVALID_CREDENTAILS_FORMAT_MSG, INVALID_CREDENTAILS_FORMAT_MSG_LEN, 0);
+            ssize_t sent = send(fd, INVALID_CREDENTIALS_FORMAT_MSG, strlen(INVALID_CREDENTIALS_FORMAT_MSG), 0);
             if (sent < 0) {
                 log(ERROR, "monitor: failed to send error message: %s", strerror(errno));
             }
-            close(fd);
             return -1;
         }
     }
@@ -374,7 +371,7 @@ static char *build_user_list_string(user_info *users, int count, monitor_connect
     int pos = 3;
 
     for (int i = 0; i < count; i++) {
-        int written = snprintf(NULL, 0, "%s:%s ", users[i].username, users[i].ip_address);
+        int written = snprintf(NULL, 0, "%s ", users[i].username);
         if (pos + written >= capacity) {
             capacity += INITIAL_USER_LIST_CAPACITY;
             char *new_user_list = realloc(user_list, capacity);
@@ -387,8 +384,8 @@ static char *build_user_list_string(user_info *users, int count, monitor_connect
             user_list = new_user_list;
         }
 
-        snprintf(user_list + pos, capacity - pos, "%s:%s ", users[i].username, users[i].ip_address);
-        log(INFO, "User %d: %s:%s", i, users[i].username, users[i].ip_address);
+        snprintf(user_list + pos, capacity - pos, "%s ", users[i].username);
+        log(INFO, "User %d: %s", i, users[i].username);
         pos += written;
     }
 
@@ -454,7 +451,6 @@ void handle_access_log_command(monitor_connection *conn) {
     log(INFO, "Amount of all time users: %d", count);
     for (int  i=0; i<count; i++) {
         log(INFO, "User %d: %s", i, users[i].username);
-        log(INFO, "IP: %s", users[i].ip_address);
         log(INFO, "Last seen: %ld", users[i].last_seen);
         log(INFO, "Sites visited: %d", users[i].site_count);
     }
@@ -462,7 +458,6 @@ void handle_access_log_command(monitor_connection *conn) {
     int written = snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Access log for all users:\n");
     for (int i = 0; i < count; i++) {
         for (int j = 0; j < users[i].site_count; j++) {
-            log(INFO, "SALI");
             site_visit *sv = &users[i].sites_visited[j];
             char timebuf[32];
             struct tm *tm_info = localtime(&sv->timestamp);
@@ -499,12 +494,11 @@ void handle_access_log_user_command(monitor_connection *conn, const char *userna
                 struct tm *tm_info = localtime(&sv->timestamp);
                 strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tm_info);
                 written += snprintf(conn->response + written, MAX_RESPONSE_SIZE - written,
-                    "%s:%s [%s] %s %s\n",
+                    "%s:%s [%s] %s\n",
                     sv->destination_host,
                     sv->destination_port,
                     timebuf,
-                    sv->success ? "SUCCESS" : "FAIL",
-                    sv->method);
+                    sv->success ? "SUCCESS" : "FAIL");
                 if (written >= MAX_RESPONSE_SIZE - 128) break;
             }
             break;

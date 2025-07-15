@@ -99,15 +99,18 @@ unsigned request_read(struct selector_key *key) {
 
     // Resolve the address
     struct addrinfo *res;
-    if (get_resolution(host, port, &res) != 0) {
+    int resolve_result = get_resolution(host, port, &res);
+    if (resolve_result != 0) {
         log(ERROR, "Failed to resolve host %s:%s", host, port);
         write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
         selector_set_interest_key(key, OP_WRITE);
+        add_user_site(connection->username[0] ? connection->username : "anonymous", port, host, false);
         return STATE_REQUEST;
     }
 
     connection->origin_res = res;
     connection->origin_res_it = res;
+    add_user_site(connection->username[0] ? connection->username : "anonymous", port, host, true);
 
     selector_set_interest_key(key, OP_NOOP);
     return connect_write(key);

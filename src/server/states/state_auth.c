@@ -54,6 +54,7 @@ unsigned auth_read(struct selector_key *key) {
     }
 
     strncpy(connection->username, username, MAX_USERNAME_LEN);
+    metrics_add_user(username, connection->origin_host);
 
     log(INFO, "Authentication successful for user: %s", username);
     return auth_write(key);    

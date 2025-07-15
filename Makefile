@@ -12,15 +12,16 @@ TARGET := server
 CLIENT_TARGET := monitor_client
 
 CC := gcc
-CFLAGS := -Wall -Wextra -g -pthread
+CFLAGS := -Wall -Wextra -g -pthread -fsanitize=address
+LDFLAGS := -pthread -fsanitize=address
 
 all: $(TARGET) $(CLIENT_TARGET)
 
 $(TARGET): $(SERVER_OBJS)
-	$(CC) -o $@ $^ -pthread
+	$(CC) -o $@ $^ $(LDFLAGS) 
 
 $(CLIENT_TARGET): $(CLIENT_OBJS)
-	$(CC) -o $@ $^
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $<
