@@ -60,8 +60,8 @@ int init_server(char *serv_port, char *monitor_port) {
     struct selector_init conf = {
         .signal = SIGALRM,
         .select_timeout = {
-            .tv_sec = 1,
-            .tv_nsec = 0,
+            .tv_sec = 0,
+            .tv_nsec = 500000000,
         },
     };
 

@@ -197,6 +197,6 @@ selector_notify_block(fd_selector s,
 
 void update_connect_timeout(unsigned int timeout_microsec);
 void add_ignored_fd(int fd);
-void remove_ignored_fd(int fd);
+void remove_ignored_fd(int fd, void * fds);
 
 #endif

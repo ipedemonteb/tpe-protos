@@ -25,24 +25,6 @@
 
 int ignored_fds[FD_SETSIZE] = {0}; 
 
-void add_ignored_fd(int fd) {
-    if (fd < 0 || fd >= FD_SETSIZE) {
-        return; 
-    }
-    if (ignored_fds[fd] == 0) {
-        ignored_fds[fd] = 1; 
-    }
-}
-
-void remove_ignored_fd(int fd) {
-    if (fd < 0 || fd >= FD_SETSIZE) {
-        return; // Invalid fd, do nothing
-    }
-    if (ignored_fds[fd] == 1) {
-        ignored_fds[fd] = 0; 
-    }
-    
-}
 
 static int ignored_fd(int fd) {
     if (fd < 0 || fd >= FD_SETSIZE) {
@@ -50,7 +32,6 @@ static int ignored_fd(int fd) {
     }
     return ignored_fds[fd] == 1;
 }
-
 
 /** retorna una descripción humana del fallo */
 const char *
@@ -83,7 +64,8 @@ selector_error(const selector_status status)
 unsigned int connect_timeout_microsec = DEFAULT_CONNECT_TIMEOUT_MICROSEC;
 
 static void
-wake_handler(const int signal)
+wake_handler(const int /*signal*/)
+
 {
     // nada que hacer. está solo para interrumpir el select
 }
@@ -146,6 +128,7 @@ struct item
     const fd_handler *handler;
     void *data;
     struct timeval tv;
+    int to_be_removed; 
 };
 
 /* tarea bloqueante */
@@ -200,6 +183,8 @@ struct fdselector
      */
     struct blocking_job *resolution_jobs;
 };
+
+typedef struct fdselector fd_selectorCDT;
 
 /** cantidad máxima de file descriptors que la plataforma puede manejar */
 #define ITEMS_MAX_SIZE FD_SETSIZE
@@ -273,7 +258,7 @@ items_max_fd(fd_selector s)
 }
 
 static void
-items_update_fdset_for_fd(fd_selector s, const struct item *item)
+items_update_fdset_for_fd(fd_selector s, struct item *item)
 {
     FD_CLR(item->fd, &s->master_r);
     FD_CLR(item->fd, &s->master_w);
@@ -656,7 +641,6 @@ finally:
 selector_status
 selector_select(fd_selector s)
 {
-    //printf("SELECTOR SELECT\n");
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
@@ -664,6 +648,11 @@ selector_select(fd_selector s)
     for (int i = 0; i <= s->max_fd; i++)
     {
         struct item *item = s->fds + i;
+        if (item->to_be_removed) {
+            selector_unregister_fd(s, i);
+            close(i);
+            item->to_be_removed = 0;
+        }
         if (ITEM_USED(item))
         {
             //printf("timeout: %ul", conf.connect_timeout_microsec);
@@ -749,4 +738,24 @@ int selector_fd_set_nio(const int fd)
 void update_connect_timeout(unsigned int timeout_microsec){
     connect_timeout_microsec = timeout_microsec;
     printf("UPDATE CONNECT TIMEOUT: %u microseconds\n", connect_timeout_microsec);
+}
+
+void add_ignored_fd(int fd) {
+    if (fd < 0 || fd >= FD_SETSIZE) {
+        return; 
+    }
+    if (ignored_fds[fd] == 0) {
+        ignored_fds[fd] = 1; 
+    }
+}
+
+void remove_ignored_fd(int fd, void * fds) {
+    if (fd < 0 || fd >= FD_SETSIZE) {
+        return; // Invalid fd, do nothing
+    }
+    if (ignored_fds[fd] == 1) {
+        ignored_fds[fd] = 0; 
+    }
+    fd_selector selector = (fd_selector)fds;
+    selector->fds[fd].to_be_removed=1;
 }
