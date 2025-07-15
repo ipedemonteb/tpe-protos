@@ -205,9 +205,9 @@ int handle_monitor_handshake_read(struct buffer *read_buff, int fd) {
         if(parse_username_password(line, username, password)) {
             buffer_reset(read_buff);
             if (credentials_are_valid(username, password) == 0) {
-                snprintf(read_buff->data, read_buff->limit - read_buff->data, "OK Welcome %s\n", username);
-                buffer_write_adv(read_buff, strlen(read_buff->data));
-                ssize_t sent = send(fd, read_buff->data, strlen(read_buff->data), 0);
+                snprintf((char *) read_buff->data, read_buff->limit - read_buff->data, "OK Welcome %s\n", username);
+                buffer_write_adv(read_buff, strlen((char *) read_buff->data));
+                ssize_t sent = send(fd, read_buff->data, strlen((char *) read_buff->data), 0);
                 buffer_reset(read_buff);
                 if (sent < 0) {
                     log(ERROR, "monitor send() failed: %s", strerror(errno));
@@ -312,7 +312,6 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                 } else if(strcmp(conn->command, "ACCESS_LOG") == 0) {
                     handle_access_log_command(conn);
                 }else if(strcmp(conn->command, "QUIT") == 0) {
-                    log(DEBUG, "Monitor client requested to quit");
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Goodbye\n");
                     send(fd, conn->response, strlen(conn->response), 0);
                     close(conn->client_fd);

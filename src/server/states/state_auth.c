@@ -1,4 +1,5 @@
 #include "include/state_auth.h"
+#include "../../monitor/metrics.h"
 
 unsigned auth_read(struct selector_key *key) {
     socks5_connection *connection = key->data;
@@ -54,7 +55,7 @@ unsigned auth_read(struct selector_key *key) {
     }
 
     strncpy(connection->username, username, MAX_USERNAME_LEN);
-    metrics_add_user(username, connection->origin_host);
+    metrics_add_user(username);
 
     log(INFO, "Authentication successful for user: %s", username);
     return auth_write(key);    
