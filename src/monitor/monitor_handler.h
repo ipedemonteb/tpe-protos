@@ -57,7 +57,6 @@ void handle_stats_command(monitor_connection *conn);
 void handle_connections_command(monitor_connection *conn);
 void handle_users_command(monitor_connection *conn);
 void handle_config_command(monitor_connection *conn, const char *args);
-void handle_timeout_command(monitor_connection *conn);
 void handle_access_log_command(monitor_connection *conn);
 void handle_access_log_user_command(monitor_connection *conn, const char *username);
 

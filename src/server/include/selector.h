@@ -1,6 +1,8 @@
 #ifndef SELECTOR_H_W50GNLODsARolpHbsDsrvYvMsbT
 #define SELECTOR_H_W50GNLODsARolpHbsDsrvYvMsbT
 
+#define DEFAULT_CONNECT_TIMEOUT_MICROSEC 10000000 // 10 sec
+
 #include <stddef.h>
 #include <sys/time.h>
 #include <stdbool.h>
@@ -72,6 +74,7 @@ struct selector_init {
 
     /** tiempo máximo de bloqueo durante `selector_iteratate' */
     struct timespec select_timeout;
+
 };
 
 /** inicializa la librería */
@@ -190,5 +193,9 @@ selector_fd_set_nio(const int fd);
 selector_status
 selector_notify_block(fd_selector s,
                  const int   fd);
+
+void update_connect_timeout(unsigned int timeout_microsec);
+void add_ignored_fd(int fd);
+void remove_ignored_fd(int fd);
 
 #endif
