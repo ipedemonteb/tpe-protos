@@ -47,6 +47,7 @@ typedef struct socks5_connection {
     char origin_port[PORT_MAX_LEN];
     uint8_t origin_atyp;
     struct addrinfo *origin_res;
+    struct addrinfo *origin_res_it;
     struct buffer read_buffer;
     struct buffer write_buffer;
     struct buffer origin_read_buffer;

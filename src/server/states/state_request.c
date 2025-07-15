@@ -5,7 +5,7 @@
 int get_ipv4_address(struct buffer *buff, char *host, char *port);
 int get_domain_name(char *host, char *port, struct buffer *buff);
 int get_ipv6_address(struct buffer *buff, char *host, char *port) ;
-int open_socket(const char *host, const char *port, struct addrinfo **res);
+int get_resolution(const char *host, const char *port, struct addrinfo **res);
 
 static void add_user_site(const char * user, const char * port, const char *site, int success) {
     char * destination_host = malloc(HOST_MAX_LEN);
@@ -28,10 +28,9 @@ static void add_user_site(const char * user, const char * port, const char *site
 
 unsigned request_read(struct selector_key *key) {
     socks5_connection *connection = key->data;
-    metrics_add_user(connection->username, connection->origin_host);
     size_t n;
     uint8_t *ptr = buffer_write_ptr(&connection->read_buffer, &n);
-    
+
     // @TODO: VER EL TEMA DE CONSUMIR DESTRUCTIVAMENTE
     ssize_t read = recv(connection->client_fd, ptr, n, 0);
     if (read < 0) {
@@ -42,16 +41,16 @@ unsigned request_read(struct selector_key *key) {
         return STATE_DONE;
     }
     buffer_write_adv(&connection->read_buffer, read);
-    
+
     if (buffer_readable_bytes(&connection->read_buffer) < 4) {
         return STATE_REQUEST;
     }
-    
+
     if(buffer_read(&connection->read_buffer) != SOCKS5_VERSION) {
         log(ERROR, "Unsupported SOCKS version in request");
         return STATE_ERROR;
     }
-    
+
     // Only support CONNECT command for now
     uint8_t cmd = buffer_read(&connection->read_buffer);
     // Reserved
@@ -62,7 +61,6 @@ unsigned request_read(struct selector_key *key) {
     char host[HOST_MAX_LEN] = {0};
     char port[PORT_MAX_LEN] = {0};
     int result = -1;
-    
     switch (atyp) {
         case IPV4_ATYP: {
             result = get_ipv4_address(&connection->read_buffer, host, port);
@@ -73,85 +71,46 @@ unsigned request_read(struct selector_key *key) {
             break;
         }
         case IPV6_ATYP:
-        result = get_ipv6_address(&connection->read_buffer, host, port);
-        break;
+            result = get_ipv6_address(&connection->read_buffer, host, port);
+            break;
         default:
-        log(ERROR, "Unsupported address type: %d", atyp);
-        write_response(&connection->write_buffer, UNSUPPORTED_ATYP, atyp, host, port);
-        selector_set_interest_key(key, OP_WRITE);
-        return STATE_REQUEST;
+            log(ERROR, "Unsupported address type: %d", atyp);
+            write_response(&connection->write_buffer, UNSUPPORTED_ATYP, atyp, host, port);
+            selector_set_interest_key(key, OP_WRITE);
+            return STATE_REQUEST;
     }
     if (result < 0) {
         log(INFO, "Request message incomplete, waiting for more bytes");
         return STATE_REQUEST;
     }
-    
+
     connection->origin_atyp = atyp;
     strncpy(connection->origin_host, host, HOST_MAX_LEN - 1);
     strncpy(connection->origin_port, port, PORT_MAX_LEN - 1);
-    
+
     if(cmd != CONNECT_CMD) {
         log(ERROR, "Unsupported command: %d", cmd);
         write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
         selector_set_interest_key(key, OP_WRITE);
         return STATE_REQUEST;
     }
-    
+
     log(INFO, "Connecting to %s:%s", host, port);
-    
-    // Open connection to the origin server
+
+    // Resolve the address
     struct addrinfo *res;
-    connection->origin_fd = open_socket(host, port, &res);
-    if (connection->origin_fd == -1) {
+    if (get_resolution(host, port, &res) != 0) {
+        log(ERROR, "Failed to resolve host %s:%s", host, port);
         write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
         selector_set_interest_key(key, OP_WRITE);
-        //@todo: agregar el usuario
-        add_user_site(connection->username, port, host, false);
         return STATE_REQUEST;
-    }
-    if (connection->origin_fd == -2) {
-        write_response(&connection->write_buffer, SERV_ERROR, atyp, host, port);
-        selector_set_interest_key(key, OP_WRITE);
-        return STATE_REQUEST;
-    }
-    connection->origin_res = res;
-    
-    if (selector_fd_set_nio(connection->origin_fd) == -1) {
-        close(connection->origin_fd);
-        freeaddrinfo(res);
-        return STATE_ERROR;
-    }
-    
-    if (connect(connection->origin_fd, res->ai_addr, res->ai_addrlen) == -1) {
-        
-        if (errno != EINPROGRESS) {
-            log(ERROR, "connect() failed: %s", strerror(errno));
-            write_response(&connection->write_buffer, CONNECTION_REFUSED, atyp, host, port);
-            log(INFO, "Connection to %s:%s failed: %s", host, port, strerror(errno));
-            add_user_site(connection->username, port, host, false);
-            close(connection->origin_fd);
-            freeaddrinfo(res);
-            return STATE_REQUEST;
-        }
-        
-        connection->references++;
-        if (selector_register(key->s, connection->origin_fd, &socks5_stm_handler, OP_WRITE, connection) != SELECTOR_SUCCESS) {
-            add_user_site(connection->username, port, host, false);
-            close(connection->origin_fd);
-            freeaddrinfo(res);
-            return STATE_ERROR;
-        }
-        selector_set_interest_key(key, OP_NOOP);
-        log(INFO, "Connection to %s:%s is in progress", host, port);
-        add_user_site(connection->username, port, host, true);
-        return STATE_CONNECT;
     }
 
-    freeaddrinfo(res);
-    write_response(&connection->write_buffer, SUCCESS, atyp, host, port);
-    add_user_site(connection->username, port, host, true);
-    selector_set_interest_key(key, OP_WRITE);
-    return request_write(key);
+    connection->origin_res = res;
+    connection->origin_res_it = res;
+
+    selector_set_interest_key(key, OP_NOOP);
+    return connect_write(key);
 }
 
 unsigned request_write(struct selector_key *key) {
@@ -233,25 +192,11 @@ int get_ipv6_address(struct buffer *buff, char *host, char *port) {
     return 0;
 }
 
-int open_socket(const char *host, const char *port, struct addrinfo **res) {
+int get_resolution(const char *host, const char *port, struct addrinfo **res) {
     struct addrinfo addr_criteria = {0};
     addr_criteria.ai_family = AF_UNSPEC; // IPv4 or IPv6
     addr_criteria.ai_socktype = SOCK_STREAM; // TCP
     addr_criteria.ai_protocol = IPPROTO_TCP; // TCP protocol
 
-    int err = getaddrinfo(host, port, &addr_criteria, res);
-    if (err != 0) {
-        log(ERROR, "getaddrinfo() failed: %s", gai_strerror(err));
-        return -1;
-    }
-
-    int sockfd = socket((*res)->ai_family, (*res)->ai_socktype, (*res)->ai_protocol);
-    if (sockfd < 0) {
-        log(ERROR, "socket() failed: %s", strerror(errno));
-        freeaddrinfo(*res);
-        *res = NULL;
-        return -2;
-    }
-
-    return sockfd;
+    return getaddrinfo(host, port, &addr_criteria, res);
 }
