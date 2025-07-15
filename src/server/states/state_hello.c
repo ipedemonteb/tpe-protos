@@ -28,7 +28,7 @@ unsigned hello_read(struct selector_key *key) {
     buffer_write_adv(&connection->read_buffer, read);
 
     size_t available;
-    uint8_t *read_ptr = buffer_read_ptr(&connection->read_buffer, &available);
+    buffer_read_ptr(&connection->read_buffer, &available);
     if (available < 2) {
         return STATE_HELLO;
     }
