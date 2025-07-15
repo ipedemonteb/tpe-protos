@@ -120,7 +120,68 @@ make clean
 
 ## Estructura:
 
-AGREGAR ESTRUCTURA
+El proyecto se estructura de la siguiente manera, guardando los archivos objeto dentro del directorio obj, y los archivos ejecutables dentro del directorio bin, como se demostró anteriormente.
+
+```
+.
+├── Makefile
+├── Makefile.inc
+├── README.md
+├── doc
+│   ├── Informe Proyecto Especial - Grupo 3.pdf
+│   └── protocol_map.md
+├── src
+│   ├── client
+│   │   └── monitor_client.c
+│   ├── server
+│   │   ├── include
+│   │   │   ├── defines.h
+│   │   │   ├── metrics.h
+│   │   │   ├── monitor_handler.h
+│   │   │   └── socks5_handler.h
+│   │   ├── metrics.c
+│   │   ├── monitor_handler.c
+│   │   ├── server.c
+│   │   ├── socks5_handler.c
+│   │   ├── states
+│   │   │   ├── include
+│   │   │   │   ├── state_auth.h
+│   │   │   │   ├── state_connect.h
+│   │   │   │   ├── state_forward.h
+│   │   │   │   ├── state_hello.h
+│   │   │   │   ├── state_request.h
+│   │   │   │   └── state_utils.h
+│   │   │   ├── state_auth.c
+│   │   │   ├── state_connect.c
+│   │   │   ├── state_forward.c
+│   │   │   ├── state_hello.c
+│   │   │   ├── state_request.c
+│   │   │   └── state_utils.c
+│   │   └── utils
+│   │       ├── buffer.c
+│   │       ├── hashmap.c
+│   │       ├── include
+│   │       │   ├── buffer.h
+│   │       │   ├── hashmap.h
+│   │       │   ├── selector.h
+│   │       │   ├── server_utils.h
+│   │       │   ├── stm.h
+│   │       │   └── user_auth_utils.h
+│   │       ├── selector.c
+│   │       ├── server_utils.c
+│   │       ├── stm.c
+│   │       └── user_auth_utils.c
+│   └── shared
+│       ├── args.c
+│       ├── include
+│       │   ├── args.h
+│       │   ├── logger.h
+│       │   └── util.h
+│       ├── logger.c
+│       └── util.c
+
+```
+
 
 <p align="right">(<a href="#tpe---protocolos-de-comunicación">Volver</a>)</p>
 

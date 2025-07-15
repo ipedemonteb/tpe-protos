@@ -1,8 +1,7 @@
 #include "include/monitor_handler.h"
 
-//@todo: deberíamos tener un archivo de configuración para estos valores?
-#define USERNAME_MAX_LEN 32
-#define PASSWORD_MAX_LEN 32
+#define USERNAME_MAX_LEN 255
+#define PASSWORD_MAX_LEN 255
 #define MAX_USERS 500
 #define MONITOR_BANNER "SOCKS-MONITOR"
 #define MONITOR_VERSION "1.0"

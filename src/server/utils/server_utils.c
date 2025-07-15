@@ -4,7 +4,6 @@
 #define BUFSIZE 256
 #define MAX_ADDR_BUFFER 128
 
-// @TODO: THIS IS BLOCKING
 static char addrBuffer[MAX_ADDR_BUFFER];
 /*
  ** Se encarga de resolver el número de puerto para service (puede ser un string con el numero o el nombre del servicio)
@@ -35,7 +34,7 @@ int setup_TCP_server_socket(const char *service) {
 		// Create a TCP socket
 		servSock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
 		if (servSock < 0) {
-			log(DEBUG, "Cant't create socket on %s : %s ", printAddressPort(addr, addrBuffer), strerror(errno));  
+			log(INFO, "Cant't create socket on %s : %s ", printAddressPort(addr, addrBuffer), strerror(errno));  
 			continue;       // Socket creation failed; try next address
 		}
 
@@ -59,7 +58,7 @@ int setup_TCP_server_socket(const char *service) {
 				log(INFO, "Binding to %s", addrBuffer);
 			}
 		} else {
-			log(DEBUG, "Cant't bind %s", strerror(errno));  
+			log(INFO, "Cant't bind %s", strerror(errno));  
 			close(servSock);  // Close and try with the next one
 			servSock = -1;
 		}

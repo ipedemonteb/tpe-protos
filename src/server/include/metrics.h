@@ -13,7 +13,6 @@
 #define MAX_PORT_LEN 6
 #define MAX_METHOD_LEN 16
 
-//@todo: ver si hace falta agregar más data
 typedef struct {
     char * destination_host;
     char * destination_port;

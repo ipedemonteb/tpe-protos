@@ -31,7 +31,6 @@ unsigned request_read(struct selector_key *key) {
     size_t n;
     uint8_t *ptr = buffer_write_ptr(&connection->read_buffer, &n);
 
-    // @TODO: VER EL TEMA DE CONSUMIR DESTRUCTIVAMENTE
     ssize_t read = recv(connection->client_fd, ptr, n, 0);
     if (read < 0) {
         log(ERROR, "recv() failed: %s", strerror(errno));

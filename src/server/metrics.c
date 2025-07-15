@@ -145,7 +145,6 @@ int metrics_get_max_connections() {
     return current_MAX_CONNECTIONS;
 }
 
-//@todo: ver si cambiar metodo de guardar usuarios activos por el hashmap
 void metrics_add_user_site(const char *username, char *site, int success, char* destination_port) {
     for (int i = 0; i < active_user_count; i++) {
         if (strcmp(active_users[i].username, username) == 0) {
@@ -171,21 +170,7 @@ void metrics_get_all_time_users(user_info *users, int max_users) {
     memcpy(users, all_time_users, count * sizeof(user_info));
 }
 
-//@todo: ver si borrar
-// static void free_site_visit(site_visit *site) {
-//     if (site != NULL) {
-//         //free(site->destination_host);
-//         //free(site->destination_port);
-//         free(site);
-//     }
-// }
 
 void metrics_free() {
-    // pthread_mutex_lock(&metrics_mutex);
-    // for (int i = 0; i < all_time_user_count; i++) {
-    //     for (int i=0; i < all_time_users[i].site_count; i++) {
-    //         free_site_visit(&all_time_users[i].sites_visited[i]);
-    //     }
-    // }
-    // pthread_mutex_unlock(&metrics_mutex);
+    // Add frees if necessary
 }
