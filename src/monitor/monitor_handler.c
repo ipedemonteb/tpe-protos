@@ -358,7 +358,7 @@ void handle_stats_command(monitor_connection *conn) {
     time_t uptime = metrics_get_server_uptime();
     
     snprintf(conn->response, MAX_RESPONSE_SIZE, 
-             "OK\nall time connections:%lu\nbytes transferred:%lu\nactive users:%d\ncurrent connections:%lu\nmax concurrent connections:%lu\nserver uptime:%ld\n",
+             "OK\nall time connections:%lu\nbytes transferred:%lu\nactive users:%d\ncurrent connections:%lu\nmax concurrent connections:%lu\nserver uptime:%lds\n",
              total_conn, total_bytes, user_count, current_conn, max_conn, uptime);
 }
 
