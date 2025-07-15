@@ -37,7 +37,8 @@
 *.hex
 
 # Program output
-monitor_client
+bin/*
+obj/*
 
 # Debug files
 *.dSYM/
