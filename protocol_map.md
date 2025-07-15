@@ -35,7 +35,6 @@ Las métricas pueden ser volátiles (se pierden si el servidor se reinicia).
 El servidor debe permitir modificar parámetros de configuración en tiempo real mediante el comando `CONFIG`. Ejemplos de parámetros configurables:
 
 - Timeout de conexiones.
-- Timeout del selector del servidor.
 
 ### Flow
 
