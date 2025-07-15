@@ -17,7 +17,7 @@
 #define OK_RESPONSE_PREFIX "OK"
 #define OK_RESPONSE_PREFIX_LEN 2
 #define QUIT_COMMAND "quit"
-#define INITIAL_MESSAGE "Type commands and press Enter. Type 'quit' to exit.\n\n"
+#define INITIAL_MESSAGE "Type commands and press Enter. Type 'QUIT' to exit.\n\n"
 
 
 int connect_to_monitor(const char *host, const char *port);
@@ -142,10 +142,6 @@ void transmit_mode(int sock) {
         command[command_len] = 0;
         
         if (command_len > 0) {
-            if (strcmp(command, QUIT_COMMAND) == 0) {
-                break;
-            }
-            
             if (strlen(command) > 0) {
                 char message[512];
                 snprintf(message, sizeof(message), "%s\n", command);
@@ -159,6 +155,10 @@ void transmit_mode(int sock) {
                 if (received > 0) {
                     buffer[received] = '\0';
                     printf("%s", buffer);
+                    if (strcmp(buffer, "OK Goodbye\n") == 0) {
+                        printf("Exiting monitor mode.\n");
+                        break;
+                    }
                 } else if (received == 0) {
                     printf("Server closed connection\n");
                     break;

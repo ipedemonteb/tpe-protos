@@ -43,7 +43,6 @@ int parse_username_password(const char *input, char *username, char *password) {
 
 void monitor_accept_connection(struct selector_key *key) {
     int server_fd = key->fd;
-    log(DEBUG, "ME ACTIVO");
     fd_selector selector = key->data;
     struct sockaddr_storage client_addr;
     socklen_t client_addr_len = sizeof(client_addr);
@@ -294,6 +293,14 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                     handle_timeout_command(conn);
                 } else if(strcmp(conn->command, "ACCESS_LOG") == 0) {
                     handle_access_log_user_command(conn, args);
+                } else if(strcmp(conn->command, "QUIT") == 0) {
+                    snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Goodbye\n");
+                    buffer_reset(write_buff);
+                    size_t response_len = strlen(conn->response);
+                    for(size_t i = 0; i < response_len; i++) {
+                        buffer_write(write_buff, conn->response[i]);
+                    }
+                    return -1;
                 } else {
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Unknown command: %s\n", conn->command);
                 }
@@ -306,8 +313,16 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                     handle_users_command(conn);
                 } else if(strcmp(conn->command, "ACCESS_LOG") == 0) {
                     handle_access_log_command(conn);
+                }else if(strcmp(conn->command, "QUIT") == 0) {
+                    log(DEBUG, "Monitor client requested to quit");
+                    snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Goodbye\n");
+                    send(fd, conn->response, strlen(conn->response), 0);
+                    close(conn->client_fd);
                 } else {
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Unknown command: %s\n", conn->command);
+                }        size_t response_len = strlen(conn->response);
+                for(size_t i = 0; i < response_len; i++) {
+                    buffer_write(write_buff, conn->response[i]);
                 }
             }
             
