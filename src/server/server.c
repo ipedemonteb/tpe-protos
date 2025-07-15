@@ -33,6 +33,10 @@ int main(int argc, char *argv[]) {
 
     parse_args(argc, argv, &args);
 
+
+    for (int i = 0; i < args.nusers; i++) 
+        create_user_credentials(args.users[i].name, args.users[i].pass);
+
     // Nothing to read from stdin, omg free FD !
     close(STDIN_FILENO);
 

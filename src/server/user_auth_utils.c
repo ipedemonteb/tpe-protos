@@ -83,18 +83,34 @@ uint8_t credentials_are_valid(const char *username, const char *password)
 {
     if (user_credentials == NULL && _fetch_user_credentials() == -1){
         user_credentials = create_hashmap(HASHMAP_SIZE);
-        printf("\n\n\nNo user credentials found, creating new hashmap\n\n\n");
     }
 
     const static_entry *user_password = hashmap_get(user_credentials, username);
     if (user_password == NULL){
         hashmap_insert(user_credentials, username, password);
         _persist_user_credentials();
-        printHash();
-        return 0x00;
+        printHash(); 
+        return 0x01;
     }
     else if (strcmp(user_password->value, password) == 0)
         return 0x00;
     else
         return 0x01;
+}
+
+
+void create_user_credentials(const char *username, const char *password){
+    if (user_credentials == NULL && _fetch_user_credentials() == -1){
+        user_credentials = create_hashmap(HASHMAP_SIZE);
+    }
+    const static_entry *user_password = hashmap_get(user_credentials, username);
+    if (user_password == NULL){
+        hashmap_insert(user_credentials, username, password);
+        _persist_user_credentials();
+        printHash();
+    } else {
+        printf("User %s already exists.\n", username);
+    }
+
+
 }
