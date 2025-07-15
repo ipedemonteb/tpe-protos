@@ -12,8 +12,8 @@ TARGET := server
 CLIENT_TARGET := monitor_client
 
 CC := gcc
-CFLAGS := -Wall -Wextra -g -pthread -fsanitize=address
-LDFLAGS := -pthread -fsanitize=address
+CFLAGS := -Wall -Wextra -g -fsanitize=address
+LDFLAGS := -fsanitize=address
 
 all: $(TARGET) $(CLIENT_TARGET)
 

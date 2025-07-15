@@ -25,24 +25,6 @@
 
 int ignored_fds[FD_SETSIZE] = {0}; 
 
-void add_ignored_fd(int fd) {
-    if (fd < 0 || fd >= FD_SETSIZE) {
-        return; 
-    }
-    if (ignored_fds[fd] == 0) {
-        ignored_fds[fd] = 1; 
-    }
-}
-
-void remove_ignored_fd(int fd) {
-    if (fd < 0 || fd >= FD_SETSIZE) {
-        return; // Invalid fd, do nothing
-    }
-    if (ignored_fds[fd] == 1) {
-        ignored_fds[fd] = 0; 
-    }
-    
-}
 
 static int ignored_fd(int fd) {
     if (fd < 0 || fd >= FD_SETSIZE) {
@@ -50,7 +32,6 @@ static int ignored_fd(int fd) {
     }
     return ignored_fds[fd] == 1;
 }
-
 
 /** retorna una descripción humana del fallo */
 const char *
@@ -200,6 +181,8 @@ struct fdselector
      */
     struct blocking_job *resolution_jobs;
 };
+
+typedef struct fdselector fd_selectorCDT;
 
 /** cantidad máxima de file descriptors que la plataforma puede manejar */
 #define ITEMS_MAX_SIZE FD_SETSIZE
@@ -656,7 +639,6 @@ finally:
 selector_status
 selector_select(fd_selector s)
 {
-    //printf("SELECTOR SELECT\n");
     struct timeval tv;
     gettimeofday(&tv, NULL);
 
@@ -749,4 +731,24 @@ int selector_fd_set_nio(const int fd)
 void update_connect_timeout(unsigned int timeout_microsec){
     connect_timeout_microsec = timeout_microsec;
     printf("UPDATE CONNECT TIMEOUT: %u microseconds\n", connect_timeout_microsec);
+}
+
+void add_ignored_fd(int fd) {
+    if (fd < 0 || fd >= FD_SETSIZE) {
+        return; 
+    }
+    if (ignored_fds[fd] == 0) {
+        ignored_fds[fd] = 1; 
+    }
+}
+
+void remove_ignored_fd(int fd, void * fds) {
+    if (fd < 0 || fd >= FD_SETSIZE) {
+        return; // Invalid fd, do nothing
+    }
+    if (ignored_fds[fd] == 1) {
+        ignored_fds[fd] = 0; 
+    }
+    fd_selector selector = (fd_selector)fds;
+    selector->fds[fd].tv.tv_sec = 0;
 }

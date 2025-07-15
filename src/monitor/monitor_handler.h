@@ -50,7 +50,7 @@ void monitor_close(struct selector_key *key);
 
 int handle_monitor_handshake_read(struct buffer *read_buff, int fd);
 int handle_monitor_handshake_write(struct buffer *write_buff, int fd);
-int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer *write_buff, monitor_connection *conn);
+int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer *write_buff, monitor_connection *conn, fd_selector selector);
 int handle_monitor_command_write(struct buffer *write_buff, int fd);
 
 void handle_stats_command(monitor_connection *conn);

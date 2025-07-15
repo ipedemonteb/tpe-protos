@@ -20,7 +20,7 @@ echo "----------------------------------------------------"
 for size in "${BUFFER_SIZES[@]}"; do
     make clean > /dev/null 2>&1
     
-    MAKE_CFLAGS="-Wall -Wextra -g -pthread -D APP_BUFFER_SIZE=${size}"
+    MAKE_CFLAGS="-Wall -Wextra -g -D APP_BUFFER_SIZE=${size}"
     make CFLAGS="${MAKE_CFLAGS}"
     
     if [ ! -f "$SERVER_BINARY" ]; then

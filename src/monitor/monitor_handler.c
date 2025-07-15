@@ -53,6 +53,7 @@ void monitor_accept_connection(struct selector_key *key) {
         log(ERROR, "monitor accept() failed: %s", strerror(errno));
         return;
     }
+    add_ignored_fd(client_fd);
 
     // Set the client socket to non-blocking
     if(selector_fd_set_nio(client_fd) == -1) {
@@ -109,7 +110,7 @@ void monitor_read(struct selector_key *key) {
             }
             break;
         case MONITOR_COMMAND_READ:
-            if(handle_monitor_command_read(&connection->read_buffer, key->fd, &connection->write_buffer, connection) != 0) {
+            if(handle_monitor_command_read(&connection->read_buffer, key->fd, &connection->write_buffer, connection, key->s) != 0) {
                 connection->state = MONITOR_ERROR_STATE;
                 selector_set_interest_key(key, OP_NOOP);
                 return;
@@ -118,6 +119,8 @@ void monitor_read(struct selector_key *key) {
                 selector_set_interest_key(key, OP_WRITE);
             }
             break;
+        case MONITOR_DONE:
+            return;
         default:
             log(ERROR, "Unknown state in monitor_read: %d", connection->state);
             connection->state = MONITOR_ERROR_STATE;
@@ -134,7 +137,6 @@ void monitor_write(struct selector_key *key) {
         close(key->fd);
         return;
     }
-
     switch(connection->state) {
         case MONITOR_HANDSHAKE_WRITE:
             if(handle_monitor_handshake_write(&connection->write_buffer, key->fd) != 0) {
@@ -247,7 +249,7 @@ int handle_monitor_handshake_write(struct buffer *write_buff, int fd) {
     return 0;
 }
 
-int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer *write_buff, monitor_connection *conn) {
+int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer *write_buff, monitor_connection *conn, fd_selector selector) {
     size_t n;
     uint8_t *ptr = buffer_write_ptr(read_buff, &n);
 
@@ -291,7 +293,6 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                 } else if(strcmp(conn->command, "ACCESS_LOG") == 0) {
                     handle_access_log_user_command(conn, args);
                 } else if(strcmp(conn->command, "QUIT") == 0) {
-                    log(INFO, "I'm here");
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Goodbye\n");
                     buffer_reset(write_buff);
                     size_t response_len = strlen(conn->response);
@@ -312,10 +313,16 @@ int handle_monitor_command_read(struct buffer *read_buff, int fd, struct buffer 
                 } else if(strcmp(conn->command, "ACCESS_LOG") == 0) {
                     handle_access_log_command(conn);
                 }else if(strcmp(conn->command, "QUIT") == 0) {
-                    log(INFO, "I'm not there");
+                    conn->state = MONITOR_DONE;
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "OK Goodbye\n");
                     send(fd, conn->response, strlen(conn->response), 0);
+                    printf("3. %d\n", conn->client_fd);
+                    remove_ignored_fd(conn->client_fd, ((void *)selector));
+                    printf("1. %d\n", conn->client_fd);
+                    //selector_unregister_fd(selector, fd);
+                    //printf("2. %d\n", conn->client_fd);
                     close(conn->client_fd);
+                    return 0;
                 } else {
                     snprintf(conn->response, MAX_RESPONSE_SIZE, "ERR Unknown command: %s\n", conn->command);
                 }        
