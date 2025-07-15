@@ -36,6 +36,10 @@
 *.x86_64
 *.hex
 
+# Program output
+server
+monitor_client
+
 # Debug files
 *.dSYM/
 *.su
@@ -62,3 +66,5 @@ CMakeFiles
 .gitignore
 
 *.bin
+# Linux files
+.fuse*
