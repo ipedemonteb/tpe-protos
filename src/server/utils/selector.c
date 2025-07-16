@@ -669,8 +669,10 @@ selector_select(fd_selector s)
 
     memcpy(&s->slave_r, &s->master_r, sizeof(s->slave_r));
     memcpy(&s->slave_w, &s->master_w, sizeof(s->slave_w));
+    
+    
     memcpy(&s->slave_t, &s->master_t, sizeof(s->slave_t));
-
+    s->slave_t.tv_sec = connect_timeout_microsec / 1000000;
 
 
     s->selector_thread = pthread_self();
