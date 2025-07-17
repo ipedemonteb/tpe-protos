@@ -198,7 +198,7 @@ int get_ipv6_address(struct buffer *buff, char *host, char *port) {
 
 int get_resolution(const char *host, const char *port, struct addrinfo **res) {
     struct addrinfo hints = {0};
-    hints.ai_family = AF_UNSPEC;    
+    hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
 
