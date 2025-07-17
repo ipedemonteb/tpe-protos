@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "../include/socks5_handler.h"
 #include "include/state_utils.h"
 #include "../include/metrics.h"
@@ -195,10 +197,30 @@ int get_ipv6_address(struct buffer *buff, char *host, char *port) {
 }
 
 int get_resolution(const char *host, const char *port, struct addrinfo **res) {
-    struct addrinfo addr_criteria = {0};
-    addr_criteria.ai_family = AF_UNSPEC; // IPv4 or IPv6
-    addr_criteria.ai_socktype = SOCK_STREAM; // TCP
-    addr_criteria.ai_protocol = IPPROTO_TCP; // TCP protocol
+    struct addrinfo hints = {0};
+    hints.ai_family = AF_UNSPEC;    
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
 
-    return getaddrinfo(host, port, &addr_criteria, res);
+    struct gaicb request = {0};
+    request.ar_name = host;
+    request.ar_service = port;
+    request.ar_request = &hints;
+    request.ar_result = NULL;
+
+    struct gaicb *requests[] = { &request };
+
+    int ret = getaddrinfo_a(GAI_WAIT, requests, 1, NULL);
+    if (ret != 0) {
+        return ret;
+    }
+
+    ret = gai_error(&request);
+    if (ret == 0 && request.ar_result != NULL) {
+        *res = request.ar_result;
+    } else {
+        *res = NULL;
+    }
+
+    return ret;
 }
