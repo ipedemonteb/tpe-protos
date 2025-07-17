@@ -5,6 +5,8 @@
 #include <arpa/inet.h>
 #include "../../utils/include/selector.h"
 #include "state_utils.h"
+#include "../../include/metrics.h"
+#include "state_resolve.h"
 
 unsigned request_read(struct selector_key *key);
 unsigned request_write(struct selector_key *key);

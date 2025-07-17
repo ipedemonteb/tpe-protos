@@ -23,6 +23,7 @@
 #include "../states/include/state_request.h"
 #include "../states/include/state_forward.h"
 #include "../states/include/state_auth.h"
+#include "../states/include/state_resolve.h"
 
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
@@ -33,6 +34,7 @@ typedef enum {
     STATE_AUTH,
     STATE_AUTH_FAILED,
     STATE_REQUEST,
+    STATE_RESOLVE,
     STATE_CONNECT,
     STATE_FORWARDING,
     STATE_DONE,
@@ -46,6 +48,7 @@ typedef struct socks5_connection {
     char origin_host[HOST_MAX_LEN];
     char origin_port[PORT_MAX_LEN];
     uint8_t origin_atyp;
+    int resolve_status;
     struct addrinfo *origin_res;
     struct addrinfo *origin_res_it;
     struct buffer read_buffer;

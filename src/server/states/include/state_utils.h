@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include "../../utils/include/buffer.h"
+#include "../../include/metrics.h"
 
 #define SOCKS5_VERSION 0x05
 #define AUTH_VERSION 0x01
@@ -26,5 +27,6 @@
 #define SUCCESS 0x00
 
 void write_response(struct buffer *write_buff, uint8_t status, uint8_t atyp, char *host, char *port);
+void add_user_site(const char * user, const char * port, const char *site, int success);
 
 #endif

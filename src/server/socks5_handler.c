@@ -35,6 +35,10 @@ static const struct state_definition socks5_states[] = {
         .on_write_ready = request_write,
     },
     {
+        .state = STATE_RESOLVE,
+        .on_block_ready = resolution_block,
+    },
+    {
         .state = STATE_CONNECT,
         .on_write_ready = connect_write,
     },

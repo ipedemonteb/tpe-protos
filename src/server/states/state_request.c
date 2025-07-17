@@ -1,30 +1,11 @@
 #include "../include/socks5_handler.h"
-#include "include/state_utils.h"
-#include "../include/metrics.h"
 
 int get_ipv4_address(struct buffer *buff, char *host, char *port);
 int get_domain_name(char *host, char *port, struct buffer *buff);
 int get_ipv6_address(struct buffer *buff, char *host, char *port) ;
 int get_resolution(const char *host, const char *port, struct addrinfo **res);
-
-static void add_user_site(const char * user, const char * port, const char *site, int success) {
-    char * destination_host = malloc(HOST_MAX_LEN);
-    if (destination_host == NULL) {
-        log(ERROR, "Failed to allocate memory for destination host");
-        return;
-    }
-    strncpy(destination_host, site, HOST_MAX_LEN - 1);
-    destination_host[HOST_MAX_LEN - 1] = '\0';
-    char * destination_port = malloc(PORT_MAX_LEN);
-    if (destination_port == NULL) {
-        log(ERROR, "Failed to allocate memory for destination port");
-        free(destination_host);
-        return;
-    }
-    strncpy(destination_port, port, PORT_MAX_LEN - 1);
-    destination_port[PORT_MAX_LEN - 1] = '\0';
-    metrics_add_user_site(user, destination_host, success, destination_port);
-}
+unsigned create_ipv6_res(struct selector_key *key, char *host, char *port);
+unsigned create_ipv4_res(struct selector_key *key, char *host, char *port);
 
 unsigned request_read(struct selector_key *key) {
     socks5_connection *connection = key->data;
@@ -56,6 +37,14 @@ unsigned request_read(struct selector_key *key) {
     buffer_read(&connection->read_buffer);
     // ATYP (Address Type)
     uint8_t atyp = buffer_read(&connection->read_buffer);
+    connection->origin_atyp = atyp;
+
+    if(cmd != CONNECT_CMD) {
+        log(ERROR, "Unsupported command: %d", cmd);
+        write_response(&connection->write_buffer, UNSUPPORTED_COMMAND, atyp, "", "");
+        selector_set_interest_key(key, OP_WRITE);
+        return STATE_REQUEST;
+    }
 
     char host[HOST_MAX_LEN] = {0};
     char port[PORT_MAX_LEN] = {0};
@@ -63,56 +52,42 @@ unsigned request_read(struct selector_key *key) {
     switch (atyp) {
         case IPV4_ATYP: {
             result = get_ipv4_address(&connection->read_buffer, host, port);
-            break;
+            if (result < 0) {
+                log(INFO, "Request message incomplete, waiting for more bytes");
+                return STATE_REQUEST;
+            }
+            add_user_site(connection->username, port, host, true);
+            strncpy(connection->origin_host, host, HOST_MAX_LEN - 1);
+            strncpy(connection->origin_port, port, PORT_MAX_LEN - 1);
+            return create_ipv4_res(key, host, port);
         }
         case DOMAIN_NAME_ATYP: {
             result = get_domain_name(host, port, &connection->read_buffer);
-            break;
+            if (result < 0) {
+                log(INFO, "Request message incomplete, waiting for more bytes");
+                return STATE_REQUEST;
+            }
+            strncpy(connection->origin_host, host, HOST_MAX_LEN - 1);
+            strncpy(connection->origin_port, port, PORT_MAX_LEN - 1);
+            return resolve_init(key);
         }
-        case IPV6_ATYP:
+        case IPV6_ATYP: {
             result = get_ipv6_address(&connection->read_buffer, host, port);
-            break;
+            if (result < 0) {
+                log(INFO, "Request message incomplete, waiting for more bytes");
+                return STATE_REQUEST;
+            }
+            add_user_site(connection->username, port, host, true);
+            strncpy(connection->origin_host, host, HOST_MAX_LEN - 1);
+            strncpy(connection->origin_port, port, PORT_MAX_LEN - 1);
+            return create_ipv6_res(key, host, port);
+        }
         default:
             log(ERROR, "Unsupported address type: %d", atyp);
             write_response(&connection->write_buffer, UNSUPPORTED_ATYP, atyp, host, port);
             selector_set_interest_key(key, OP_WRITE);
             return STATE_REQUEST;
     }
-    if (result < 0) {
-        log(INFO, "Request message incomplete, waiting for more bytes");
-        return STATE_REQUEST;
-    }
-
-    connection->origin_atyp = atyp;
-    strncpy(connection->origin_host, host, HOST_MAX_LEN - 1);
-    strncpy(connection->origin_port, port, PORT_MAX_LEN - 1);
-
-    if(cmd != CONNECT_CMD) {
-        log(ERROR, "Unsupported command: %d", cmd);
-        write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
-        selector_set_interest_key(key, OP_WRITE);
-        return STATE_REQUEST;
-    }
-
-    log(INFO, "Connecting to %s:%s", host, port);
-
-    // Resolve the address
-    struct addrinfo *res;
-    int resolve_result = get_resolution(host, port, &res);
-    if (resolve_result != 0) {
-        log(ERROR, "Failed to resolve host %s:%s", host, port);
-        write_response(&connection->write_buffer, HOST_UNREACHABLE, atyp, host, port);
-        selector_set_interest_key(key, OP_WRITE);
-        add_user_site(connection->username, port, host, false);
-        return STATE_REQUEST;
-    }
-
-    connection->origin_res = res;
-    connection->origin_res_it = res;
-    add_user_site(connection->username, port, host, true);
-
-    selector_set_interest_key(key, OP_NOOP);
-    return connect_write(key);
 }
 
 unsigned request_write(struct selector_key *key) {
@@ -127,6 +102,11 @@ unsigned request_write(struct selector_key *key) {
     buffer_read_adv(&connection->write_buffer, sent);
     if (buffer_can_read(&connection->write_buffer)) {
         return STATE_REQUEST;
+    }
+
+    if(connection->origin_fd == -1) {
+        log(INFO, "No origin_fd to forward, closing connection");
+        return STATE_DONE;
     }
 
     if (selector_set_interest(key->s, connection->client_fd, OP_READ) != SELECTOR_SUCCESS ||
@@ -194,11 +174,68 @@ int get_ipv6_address(struct buffer *buff, char *host, char *port) {
     return 0;
 }
 
-int get_resolution(const char *host, const char *port, struct addrinfo **res) {
-    struct addrinfo addr_criteria = {0};
-    addr_criteria.ai_family = AF_UNSPEC; // IPv4 or IPv6
-    addr_criteria.ai_socktype = SOCK_STREAM; // TCP
-    addr_criteria.ai_protocol = IPPROTO_TCP; // TCP protocol
+unsigned create_ipv4_res(struct selector_key *key, char *host, char *port) {
+    socks5_connection *connection = key->data;
+    struct sockaddr_in *addr = malloc(sizeof(struct sockaddr_in));
+    struct addrinfo *ai = calloc(1, sizeof(struct addrinfo));
+    if (!addr || !ai) {
+        log(ERROR, "Memory allocation failed");
+        free(addr); 
+        free(ai);
+        return STATE_ERROR;
+    }
 
-    return getaddrinfo(host, port, &addr_criteria, res);
+    addr->sin_family = AF_INET;
+    addr->sin_port = htons(atoi(port));
+    inet_pton(AF_INET, host, &addr->sin_addr);
+    if (inet_pton(AF_INET, host, &addr->sin_addr) != 1) {
+        log(ERROR, "inet_pton failed for IPv4: %s", host);
+        free(addr); 
+        free(ai);
+    return STATE_ERROR;
+}
+
+    ai->ai_family = AF_INET;
+    ai->ai_socktype = SOCK_STREAM;
+    ai->ai_protocol = IPPROTO_TCP;
+    ai->ai_addr = (struct sockaddr *)addr;
+    ai->ai_addrlen = sizeof(struct sockaddr_in);
+
+    connection->origin_res = ai;
+    connection->origin_res_it = ai;
+
+    selector_set_interest_key(key, OP_NOOP);
+    return connect_write(key);
+}
+
+unsigned create_ipv6_res(struct selector_key *key, char *host, char *port) {
+    socks5_connection *connection = key->data;
+    struct sockaddr_in6 *addr6 = malloc(sizeof(struct sockaddr_in6));
+    struct addrinfo *ai6 = calloc(1, sizeof(struct addrinfo));
+    if (!addr6 || !ai6) {
+        log(ERROR, "Memory allocation failed");
+        free(addr6); 
+        free(ai6);
+        return STATE_ERROR;
+    }
+
+    addr6->sin6_family = AF_INET6;
+    addr6->sin6_port = htons(atoi(port));
+    if (inet_pton(AF_INET6, host, &addr6->sin6_addr) != 1) {
+        log(ERROR, "inet_pton failed for IPv6: %s", host);
+        free(addr6); free(ai6);
+        return STATE_ERROR;
+    }
+
+    ai6->ai_family = AF_INET6;
+    ai6->ai_socktype = SOCK_STREAM;
+    ai6->ai_protocol = IPPROTO_TCP;
+    ai6->ai_addr = (struct sockaddr *)addr6;
+    ai6->ai_addrlen = sizeof(struct sockaddr_in6);
+
+    connection->origin_res = ai6;
+    connection->origin_res_it = ai6;
+
+    selector_set_interest_key(key, OP_NOOP);
+    return connect_write(key);
 }

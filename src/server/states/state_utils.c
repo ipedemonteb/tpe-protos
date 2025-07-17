@@ -91,3 +91,22 @@ void write_ipv6_address(struct buffer *write_buff, char *host) {
         for (int i = 0; i < 16; i++) buffer_write(write_buff, 0x00);
     }
 }
+
+void add_user_site(const char * user, const char * port, const char *site, int success) {
+    char * destination_host = malloc(HOST_MAX_LEN);
+    if (destination_host == NULL) {
+        log(ERROR, "Failed to allocate memory for destination host");
+        return;
+    }
+    strncpy(destination_host, site, HOST_MAX_LEN - 1);
+    destination_host[HOST_MAX_LEN - 1] = '\0';
+    char * destination_port = malloc(PORT_MAX_LEN);
+    if (destination_port == NULL) {
+        log(ERROR, "Failed to allocate memory for destination port");
+        free(destination_host);
+        return;
+    }
+    strncpy(destination_port, port, PORT_MAX_LEN - 1);
+    destination_port[PORT_MAX_LEN - 1] = '\0';
+    metrics_add_user_site(user, destination_host, success, destination_port);
+}
